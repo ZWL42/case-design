@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>万物共鸣 · 中国濒危物种视听觉交互体验</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:#05050a;color:#fff;font-family:'PingFang SC','Microsoft YaHei',sans-serif;overflow-x:hidden}
+
+/* ── 固定画布 ─────────────────────────────── */
+#cvs{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+
+/* ── 滚动叙事层 ────────────────────────────── */
+#story{position:relative;z-index:1}
+
+/* ── 通用区块 ──────────────────────────────── */
+.sec{min-height:100vh;display:flex;align-items:center;padding:0 7vw}
+.sec.col{flex-direction:column;justify-content:center;text-align:center}
+.sec.right{justify-content:flex-end}
+.sec.center{justify-content:center}
+
+/* ── 文字卡片 ──────────────────────────────── */
+.card{
+  max-width:420px;
+  background:rgba(0,0,0,.5);
+  backdrop-filter:blur(6px);
+  border-left:1px solid rgba(255,255,255,.1);
+  padding:36px 32px;
+}
+.card h2{
+  font-family:'STSong','SimSun',serif;
+  font-size:clamp(18px,2.4vw,28px);
+  font-weight:300;letter-spacing:.25em;
+  color:#fff;margin-bottom:18px;
+}
+.card p{
+  font-size:clamp(12px,1.4vw,14px);
+  line-height:2;color:rgba(255,255,255,.6);
+  margin-bottom:10px;
+}
+.card em{color:rgba(255,160,100,.8);font-style:normal}
+.card .src{
+  margin-top:18px;font-size:10px;
+  color:rgba(255,255,255,.25);line-height:1.8;
+}
+
+/* ── 封面 ───────────────────────────────────── */
+#s0{min-height:100vh;pointer-events:all}
+#s0 h1{
+  font-family:'STSong','SimSun',serif;
+  font-size:clamp(40px,9vw,110px);font-weight:200;
+  letter-spacing:.55em;
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:22px;
+}
+#s0 .sub{font-size:clamp(11px,1.4vw,14px);letter-spacing:.3em;color:rgba(255,255,255,.28);margin-bottom:6px}
+.arrow{
+  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,.18);font-size:11px;letter-spacing:.2em;
+  animation:blink 2.2s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:.18}50%{opacity:.55}}
+
+/* ── 已灭绝物种网格 ─────────────────────────── */
+.extinct-wrap{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:20px;max-width:820px;width:100%;pointer-events:none;
+}
+.ext-card{
+  border:1px solid rgba(255,255,255,.07);
+  padding:28px 22px;
+  background:rgba(255,255,255,.02);
+}
+.ext-card .ch{
+  font-family:'STSong','SimSun',serif;
+  font-size:30px;font-weight:300;
+  color:rgba(255,255,255,.22);margin-bottom:6px;
+}
+.ext-card .en{font-size:10px;color:rgba(255,255,255,.15);margin-bottom:10px;letter-spacing:.05em}
+.ext-card .yr{font-size:22px;color:rgba(220,80,80,.5);margin-bottom:14px;letter-spacing:.05em}
+.ext-card .info{font-size:11px;color:rgba(255,255,255,.22);line-height:1.9}
+.ext-card .note{
+  margin-top:12px;font-size:10px;font-style:italic;
+  color:rgba(220,80,80,.4);line-height:1.8;
+}
+
+/* ── 濒危5种列表 ─────────────────────────────── */
+.sp-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:16px;max-width:860px;width:100%;pointer-events:none;
+}
+.sp-card{
+  border:1px solid rgba(255,255,255,.06);
+  padding:22px 18px;background:rgba(255,255,255,.02);
+}
+.sp-card .ch{
+  font-family:'STSong','SimSun',serif;
+  font-size:22px;font-weight:300;margin-bottom:6px;
+}
+.sp-card .st{font-size:10px;margin-bottom:10px;letter-spacing:.05em}
+.sp-card .dt{font-size:11px;color:rgba(255,255,255,.38);line-height:1.9}
+
+/* ── 希望 ───────────────────────────────────── */
+.hope-inner{
+  max-width:540px;text-align:center;pointer-events:none;
+  border-top:1px solid rgba(255,195,210,.18);
+  padding-top:40px;
+}
+.hope-inner .num{
+  font-family:'STSong','SimSun',serif;
+  font-size:clamp(40px,7vw,80px);font-weight:200;
+  color:rgba(255,195,210,.7);letter-spacing:.1em;
+  margin-bottom:10px;
+}
+.hope-inner h3{
+  font-family:'STSong','SimSun',serif;
+  font-size:clamp(16px,2vw,22px);font-weight:300;
+  letter-spacing:.3em;margin-bottom:20px;
+}
+.hope-inner p{font-size:13px;line-height:2.2;color:rgba(255,255,255,.55);margin-bottom:10px}
+
+/* ── 结尾 ───────────────────────────────────── */
+#s6{pointer-events:all;cursor:default}
+#s6 .q{
+  font-family:'STSong','SimSun',serif;
+  font-size:clamp(16px,2.5vw,26px);font-weight:300;
+  letter-spacing:.3em;color:rgba(255,255,255,.6);
+  margin-bottom:18px;
+}
+#s6 .tagline{font-size:13px;color:rgba(255,255,255,.25);letter-spacing:.2em}
+
+/* ── 滚动进度条 ─────────────────────────────── */
+#bar{position:fixed;top:0;left:0;height:1px;background:rgba(255,255,255,.25);z-index:100;transition:width .1s}
+
+/* ── 麦克风按钮 ─────────────────────────────── */
+#mic{
+  position:fixed;bottom:28px;right:28px;z-index:50;
+  border:1px solid rgba(255,255,255,.15);
+  background:rgba(0,0,0,.65);
+  backdrop-filter:blur(4px);
+  padding:14px 18px;cursor:pointer;
+  font-size:11px;color:rgba(255,255,255,.45);
+  letter-spacing:.1em;transition:all .3s;pointer-events:all;
+}
+#mic:hover{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.9)}
+#mic .ms{margin-top:5px;font-size:9px;color:rgba(255,255,255,.25)}
+
+/* ── 声音切换按钮 ────────────────────────────── */
+#sound-toggle{
+  position:fixed;bottom:28px;left:28px;z-index:50;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(0,0,0,.6);
+  padding:12px 16px;cursor:pointer;
+  font-size:11px;color:rgba(255,255,255,.35);
+  pointer-events:all;transition:all .3s;
+}
+#sound-toggle:hover{color:rgba(255,255,255,.8)}
+
+/* ── 物种照片背景 ─────────────────────────────── */
+.sp-card{position:relative;overflow:hidden}
+.sp-bg{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  object-fit:cover;object-position:center 25%;
+  opacity:.14;filter:grayscale(1) contrast(1.1);
+  pointer-events:none;
+}
+.sp-card>*:not(.sp-bg){position:relative;z-index:1}
+
+/* ── 灭绝物种SVG剪影 ─────────────────────────── */
+.ext-svg{
+  display:block;width:100%;height:66px;
+  margin-bottom:12px;
+}
+.ext-card{position:relative;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<canvas id="cvs"></canvas>
+<!-- ── 真实录音 ─────────────────────────────────── -->
+<audio id="aud-baiji"    src="声音/白鳍豚.mp3"                                        loop preload="none"></audio>
+<audio id="aud-ibis"     src="声音/朱鹮.mp3"                                        loop preload="none"></audio>
+<audio id="aud-forest"   src="声音/eryliaa-forest-wind-with-birds-singing-364368.mp3" loop preload="none"></audio>
+<audio id="aud-city"     src="声音/freesound_community-city-noise-30537.mp3"          loop preload="none"></audio>
+<audio id="aud-citybird" src="声音/baranova_n-city-birds-444667.mp3"                  loop preload="none"></audio>
+
+<div id="mic" onclick="reqMic()">
+  🎙 连接麦克风
+  <div class="ms" id="ms">点击感知环境声音</div>
+</div>
+<div id="sound-toggle" onclick="toggleSound()">♪ 声音：关</div>
+
+<!-- ══════════════ 叙事内容 ══════════════ -->
+<div id="story">
+
+<!-- S0 封面 -->
+<section id="s0" class="sec col" data-s="intro" style="position:relative">
+  <h1>万物共鸣</h1>
+  <p class="sub">中国濒危物种 · 视听觉交互体验设计</p>
+  <p style="font-size:10px;color:rgba(255,255,255,.15);letter-spacing:.2em">周小钧 · 广东白云学院 · 22数字媒体艺术1班</p>
+  <div class="arrow">↓ &nbsp;向下滚动 &nbsp;↓</div>
+</section>
+
+<!-- S1 共鸣 -->
+<section id="s1" class="sec" data-s="resonance" style="min-height:150vh;align-items:flex-start;padding-top:25vh">
+  <div class="card">
+    <h2>亿万年的共鸣</h2>
+    <p>地球的声景从不属于任何单一的物种。鸟鸣、兽啸、水声、虫鸣——每一种生命都在发出自己的频率，而所有的频率叠加在一起，才构成这颗星球真正的声景。</p>
+    <p>食物链存在，捕食发生，强势物种更迭。但整个系统维持着周期性的稳定，<em>从未有哪一种声音彻底消失</em>。</p>
+    <p>这种平衡已在地球上维持了数亿年。</p>
+    <div class="src">数据来源：IUCN 全球物种红色名录 · 中国生物多样性监测与研究网络</div>
+  </div>
+</section>
+
+<!-- S2 失衡 -->
+<section id="s2" class="sec right" data-s="disturb" style="min-height:130vh;align-items:flex-start;padding-top:22vh">
+  <div class="card">
+    <h2>一种物种改变了一切</h2>
+    <p>人类凭借语言、工具与协作站上食物链顶端。这本身没有错——自然史上不乏一时主导的物种。</p>
+    <p>真正的转折是工业革命之后：技术使生产规模突破了自然的缓冲边界，扩张不再以"换届"结束，而是以其他物种的<em>永久消失</em>为代价。</p>
+    <p>1900年至今，地球物种灭绝速度是自然灭绝速率的 <em>1000 倍</em>以上。中国的物种受威胁比例，在哺乳类中达到 <em>20% 以上</em>。</p>
+    <div class="src">来源：江建平等.中国两栖动物受威胁现状评估.生物多样性,2016 ·<br>马建章等.中国野生动物与栖息地保护现状及发展趋势.2003</div>
+  </div>
+</section>
+
+<!-- S3 已消失 -->
+<section id="s3" class="sec col" data-s="extinct" style="min-height:190vh;justify-content:flex-start;padding-top:14vh;gap:50px">
+  <div style="text-align:center;max-width:600px;pointer-events:none">
+    <h2 style="font-family:'STSong',serif;font-size:clamp(18px,2.5vw,28px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.65);margin-bottom:14px">他们已经离开了</h2>
+    <p style="font-size:12px;color:rgba(255,255,255,.3);line-height:2;letter-spacing:.06em">以下三种动物在中国境内已宣告灭绝或功能性灭绝<br>它们的声音不会再出现在这颗星球上</p>
+  </div>
+
+  <div class="extinct-wrap">
+    <!-- 白鳍豚 -->
+    <div class="ext-card">
+      <!-- 白鳍豚剪影：长喙、低背鳍、宽尾鳍 -->
+      <svg class="ext-svg" viewBox="0 0 160 66" xmlns="http://www.w3.org/2000/svg" fill="rgba(140,170,210,0.35)">
+        <!-- 主体 -->
+        <path d="M32,33 C46,18 72,19 98,22 C118,24 136,28 144,33 C136,38 118,42 98,44 C72,47 46,48 32,33 Z"/>
+        <!-- 长喙（里海豚特征） -->
+        <path d="M2,30 L32,29 L32,37 L2,36 Z"/>
+        <!-- 背鳍（低而小） -->
+        <path d="M90,22 L97,11 L105,22 Z"/>
+        <!-- 尾鳍（分叉） -->
+        <path d="M142,32 L154,22 L152,33 L154,44 L142,34 Z"/>
+        <!-- 胸鳍 -->
+        <path d="M68,36 L62,48 L74,42 Z"/>
+      </svg>
+      <div class="ch">白鳍豚</div>
+      <div class="en">Baiji · Yangtze River Dolphin<br><em style="color:rgba(255,255,255,.1)">Lipotes vexillifer</em></div>
+      <div class="yr">2006</div>
+      <div class="info">
+        功能性灭绝宣告<br>
+        曾栖居长江全流域<br>
+        在地球上已生存约 2,500 万年<br>
+        死于过度捕捞 · 航运噪声 · 污染
+      </div>
+      <div class="note">
+        人类历史上第一次亲手令<br>鲸豚目物种走向灭绝。<br><br>
+        ※ 历史录音存于 dosits.org<br>及中国科学院水生生物研究所
+      </div>
+    </div>
+
+    <!-- 斑鳖 -->
+    <div class="ext-card">
+      <!-- 斑鳖剪影：俯视视角，圆盘甲壳，猪吻状鼻端 -->
+      <svg class="ext-svg" viewBox="0 0 140 100" xmlns="http://www.w3.org/2000/svg" fill="rgba(150,195,155,0.35)">
+        <!-- 甲壳（大而圆的椭圆，扁平软壳特征） -->
+        <ellipse cx="70" cy="62" rx="52" ry="33"/>
+        <!-- 颈部 -->
+        <path d="M62,30 L78,30 L80,44 L60,44 Z"/>
+        <!-- 头部（略椭圆，有特征性猪吻） -->
+        <ellipse cx="70" cy="24" rx="14" ry="11"/>
+        <!-- 猪吻鼻端（斑鳖最显著特征） -->
+        <ellipse cx="70" cy="15" rx="8" ry="5"/>
+        <!-- 前肢（宽大桨状） -->
+        <path d="M18,52 L38,43 L38,58 Z"/>
+        <path d="M122,52 L102,43 L102,58 Z"/>
+        <!-- 后肢 -->
+        <path d="M26,74 L44,65 L42,78 Z"/>
+        <path d="M114,74 L96,65 L98,78 Z"/>
+      </svg>
+      <div class="ch">斑鳖</div>
+      <div class="en">Yangtze Giant Softshell Turtle<br><em style="color:rgba(255,255,255,.1)">Rafetus swinhoei</em></div>
+      <div class="yr">2019</div>
+      <div class="info">
+        中国境内已知最后个体死亡<br>
+        曾为世界最大淡水龟之一<br>
+        栖居长江 · 太湖 · 红河流域<br>
+        可存活逾百年
+      </div>
+      <div class="note">
+        最后的雌性死于苏州动物园，<br>
+        死因：人工授精操作失误。<br>
+        我们连最后的机会也没把握住。<br><br>
+        ※ 斑鳖无明显发声，声音记录极稀少
+      </div>
+    </div>
+
+    <!-- 新疆虎 -->
+    <div class="ext-card">
+      <!-- 新疆虎剪影：侧视，强健体型，低垂长尾 -->
+      <svg class="ext-svg" viewBox="0 0 180 96" xmlns="http://www.w3.org/2000/svg">
+        <!-- 身体（虎的横向长矩形躯干） -->
+        <path d="M48,62 C48,42 58,30 76,28 C100,26 138,28 145,36 C150,44 148,62 140,68 L50,68 Z" fill="rgba(195,165,125,0.38)"/>
+        <!-- 头部 -->
+        <ellipse cx="38" cy="44" rx="26" ry="20" fill="rgba(195,165,125,0.38)"/>
+        <!-- 耳朵 -->
+        <polygon points="18,26 26,42 12,40" fill="rgba(195,165,125,0.38)"/>
+        <polygon points="36,24 46,40 30,42" fill="rgba(195,165,125,0.38)"/>
+        <!-- 吻部 -->
+        <ellipse cx="22" cy="50" rx="10" ry="8" fill="rgba(195,165,125,0.28)"/>
+        <!-- 尾巴（长而下垂，向上弯） -->
+        <path d="M140,52 Q162,38 170,55 Q165,68 148,62 Z" fill="rgba(195,165,125,0.35)"/>
+        <!-- 四条腿 -->
+        <rect x="58"  y="66" width="13" height="24" rx="5" fill="rgba(195,165,125,0.32)"/>
+        <rect x="78"  y="66" width="13" height="24" rx="5" fill="rgba(195,165,125,0.32)"/>
+        <rect x="108" y="64" width="13" height="26" rx="5" fill="rgba(195,165,125,0.32)"/>
+        <rect x="126" y="64" width="13" height="26" rx="5" fill="rgba(195,165,125,0.32)"/>
+        <!-- 虎纹（斜线装饰） -->
+        <line x1="78"  y1="30" x2="72"  y2="66" stroke="rgba(0,0,0,0.12)" stroke-width="5" stroke-linecap="round"/>
+        <line x1="96"  y1="28" x2="93"  y2="66" stroke="rgba(0,0,0,0.12)" stroke-width="5" stroke-linecap="round"/>
+        <line x1="114" y1="28" x2="114" y2="66" stroke="rgba(0,0,0,0.12)" stroke-width="5" stroke-linecap="round"/>
+        <line x1="130" y1="30" x2="132" y2="64" stroke="rgba(0,0,0,0.12)" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <div class="ch">新疆虎</div>
+      <div class="en">Caspian Tiger · Xinjiang<br><em style="color:rgba(255,255,255,.1)">Panthera tigris virgata</em></div>
+      <div class="yr">约 1970s</div>
+      <div class="info">
+        里海虎中国亚种<br>
+        曾广布新疆塔里木河流域<br>
+        由于过度猎杀与栖息地丧失<br>
+        在中国境内悄然消失
+      </div>
+      <div class="note">
+        没有人记录下最后一只的死亡，<br>
+        它只是慢慢地不再出现了。<br><br>
+        ※ 虎属声音可参考历史档案<br>及相近亚种录音
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- S4 濒危5种 -->
+<section id="s4" class="sec col" data-s="endangered" style="min-height:260vh;justify-content:flex-start;padding-top:12vh;gap:40px">
+  <div style="text-align:center;max-width:600px;pointer-events:none">
+    <h2 style="font-family:'STSong',serif;font-size:clamp(17px,2.3vw,26px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.65);margin-bottom:12px">还在呼吸的</h2>
+    <p style="font-size:12px;color:rgba(255,255,255,.28);letter-spacing:.1em;line-height:2.2">它们还在。但我们不知道还有多久。<br>上方粒子是它们当下的存在 · 你的声音是干扰的来源</p>
+  </div>
+
+  <div class="sp-grid">
+    <div class="sp-card">
+      <img class="sp-bg" src="图片/雪豹.jpg" alt="">
+      <div class="ch" style="color:rgba(190,220,255,.75)">雪豹</div>
+      <div class="st" style="color:rgba(190,220,255,.4)">Snow Leopard · 极危 CR</div>
+      <div class="dt">青藏高原 · 天山 · 祁连山<br>全球约 4,000 只<br>气候变化正压缩其高海拔栖息地<br><br>※ 声音：高原低吼 / 求偶嚎叫<br>推荐来源：Macaulay Library</div>
+    </div>
+    <div class="sp-card">
+      <img class="sp-bg" src="图片/朱鹮.jpg" alt="">
+      <div class="ch" style="color:rgba(255,195,210,.75)">朱鹮</div>
+      <div class="st" style="color:rgba(255,195,210,.4)">Crested Ibis · 濒危 EN</div>
+      <div class="dt">陕西洋县 · 汉中盆地<br>1981年仅剩 7 只<br>经 42 年保护，已回升至约 2,000 只<br><br>※ 声音：特征性低鸣 / 群鸟叫声<br>推荐来源：Xeno-canto XC号段</div>
+    </div>
+    <div class="sp-card">
+      <img class="sp-bg" src="图片/扬子鳄.jpg" alt="">
+      <div class="ch" style="color:rgba(140,215,170,.75)">扬子鳄</div>
+      <div class="st" style="color:rgba(140,215,170,.4)">Chinese Alligator · 极危 CR</div>
+      <div class="dt">安徽 · 长江下游支流湿地<br>野外仅约 120 条<br>农业扩张吞噬了几乎所有栖息地<br><br>※ 声音：低沉震鸣 / 繁殖期吼叫<br>推荐来源：中科院动物所档案</div>
+    </div>
+    <div class="sp-card" style="grid-column:1/3">
+      <img class="sp-bg" src="图片/长江江豚.jpg" alt="" style="object-position:center 40%">
+      <div class="ch" style="color:rgba(160,195,255,.75)">长江江豚</div>
+      <div class="st" style="color:rgba(160,195,255,.4)">Yangtze Finless Porpoise · 极危 CR</div>
+      <div class="dt">长江全流域 · 约 1,249 头<br>白鳍豚已于 2006 年功能性灭绝，江豚是长江仅存的鲸豚目动物<br>2022 年长江十年禁渔后种群开始缓慢回升<br><br>※ 声音：高频声呐脉冲 / 社交叫声<br>推荐来源：中科院水生生物研究所 / Discovery of Sound in the Sea</div>
+    </div>
+    <div class="sp-card">
+      <img class="sp-bg" src="图片/华南虎.jpg" alt="">
+      <div class="ch" style="color:rgba(255,195,130,.75)">华南虎</div>
+      <div class="st" style="color:rgba(255,195,130,.4)">South China Tiger · 野外灭绝 EW</div>
+      <div class="dt">华南 · 南岭山系<br>圈养不足 100 只，野外已无记录<br>上一次野外可信目击已逾二十年<br><br>※ 声音：低频咆哮 / 喘息声<br>推荐来源：历史档案 / 相近亚种</div>
+    </div>
+  </div>
+</section>
+
+<!-- S5 希望 -->
+<section id="s5" class="sec center" data-s="hope" style="min-height:120vh">
+  <div class="hope-inner">
+    <div class="num">7</div>
+    <h3>洋县，1981</h3>
+    <p>中国鸟类学家刘荫增在陕西洋县金家河，发现了地球上最后存活的 7 只朱鹮。</p>
+    <p>从 7 只到 2,000 只，中国用了 42 年。这需要的不只是技术——它需要几代人持续的选择：农民放弃农药，政府将整个县纳入保护范围，研究人员守护每一个巢穴。</p>
+    <p style="color:rgba(255,195,210,.55)">消失不是终点，只要我们还没放弃。</p>
+    <p style="font-size:11px;color:rgba(255,255,255,.2);margin-top:20px;font-style:italic">— 但这个结果并不常见。更多的物种，没有等到那一刻。</p>
+  </div>
+</section>
+
+<!-- S6 结尾 -->
+<section id="s6" class="sec col" data-s="choice" style="min-height:100vh">
+  <p class="q">你想生活在一个什么样的声景里？</p>
+  <p class="tagline">独鸣或易，众方美丽</p>
+  <p style="margin-top:40px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.15em">《万物共鸣》· 周小钧 · 广东白云学院 · 2026</p>
+</section>
+
+</div><!-- /story -->
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// 数据
+// ══════════════════════════════════════════════════════════════
+const SP = [
+  {name:'雪豹',  en:'Snow Leopard',         st:'极危 CR',     col:[190,220,255], z:{x:.20,y:.33}},
+  {name:'朱鹮',  en:'Crested Ibis',         st:'濒危 EN',     col:[255,195,210], z:{x:.50,y:.27}},
+  {name:'扬子鳄',en:'Chinese Alligator',    st:'极危 CR',     col:[140,215,170], z:{x:.80,y:.40}},
+  {name:'长江江豚',en:'Yangtze Porpoise',   st:'极危 CR',     col:[160,195,255], z:{x:.30,y:.70}},
+  {name:'华南虎',en:'South China Tiger',    st:'野外灭绝 EW', col:[255,195,130], z:{x:.70,y:.68}},
+];
+const EX = [
+  {name:'白鳍豚',col:[140,170,210], z:{x:.18,y:.18}},
+  {name:'斑鳖',  col:[150,195,155], z:{x:.50,y:.13}},
+  {name:'新疆虎',col:[195,165,125], z:{x:.82,y:.18}},
+];
+
+// ══════════════════════════════════════════════════════════════
+// 状态
+// ══════════════════════════════════════════════════════════════
+let STATE = 'intro';
+let vit   = SP.map(()=>1.0);   // 每物种活跃度
+let eVit  = EX.map(()=>0.0);   // 消亡物种显示度
+let micLv = 0, micOn = false;
+let sndOn = false;
+let silT  = 0;
+let audioCtx, oscillators = [];
+let bgStarted = false;
+let cityLatch = false;
+
+// ══════════════════════════════════════════════════════════════
+// 滚动 & 进度
+// ══════════════════════════════════════════════════════════════
+const secs = document.querySelectorAll('[data-s]');
+const io = new IntersectionObserver(es=>{
+  es.forEach(e=>{ if(e.isIntersecting && e.intersectionRatio>.25) STATE=e.target.dataset.s; });
+},{threshold:[.25]});
+secs.forEach(s=>io.observe(s));
+
+window.addEventListener('scroll',()=>{
+  let p = window.scrollY/(document.body.scrollHeight-window.innerHeight);
+  document.getElementById('bar').style.width=(p*100)+'%';
+});
+
+// ══════════════════════════════════════════════════════════════
+// 麦克风
+// ══════════════════════════════════════════════════════════════
+async function reqMic(){
+  try{
+    let stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    let ctx = new (window.AudioContext||window.webkitAudioContext)();
+    let src = ctx.createMediaStreamSource(stream);
+    let an  = ctx.createAnalyser(); an.fftSize=256;
+    src.connect(an);
+    let buf = new Uint8Array(an.frequencyBinCount);
+    micOn=true;
+    document.getElementById('ms').textContent='✓ 已连接';
+    document.getElementById('mic').style.borderColor='rgba(100,255,150,.3)';
+    (function t(){ an.getByteFrequencyData(buf);
+      let s=0; for(let v of buf)s+=v;
+      micLv=micLv*.88+(s/buf.length/128)*.12;
+      requestAnimationFrame(t);
+    })();
+  }catch(e){document.getElementById('ms').textContent='无法访问麦克风';}
+}
+
+// ══════════════════════════════════════════════════════════════
+// 声音系统（真实录音 + 合成占位）
+// ══════════════════════════════════════════════════════════════
+const FREQ = [280, 540, 90, 520, 180]; // Hz 合成音基频（占位用）
+const FREQ_MOD = SP.map((_,i)=>({
+  phase: Math.random()*Math.PI*2,
+  rate: 0.22 + i*0.09,               // 低频调制速度（Hz）
+  depth: i===3 ? 0.02 : 0.03         // 调制深度
+}));
+
+// 真实录音元素引用
+const audBaiji   = document.getElementById('aud-baiji');    // 白鳍豚
+const audIbis    = document.getElementById('aud-ibis');     // 朱鹮
+const audForest  = document.getElementById('aud-forest');   // 自然背景底音
+const audCity    = document.getElementById('aud-city');     // 人类干扰城市噪声
+const audCityBird= document.getElementById('aud-citybird'); // 城市鸟鸣（结尾）
+
+function startBgTracks(){
+  if(bgStarted) return;
+  [audForest, audCity, audCityBird].forEach(a=>{
+    a.volume = 0;
+    a.play().catch(()=>{});
+  });
+  bgStarted = true;
+}
+
+function toggleSound(){
+  sndOn = !sndOn;
+  document.getElementById('sound-toggle').textContent = '♪ 声音：'+(sndOn?'开':'关');
+  if(sndOn){
+    startBgTracks();
+    // 合成音（雪豹·扬子鳄·江豚·华南虎 占位）
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    audioCtx.resume().catch(()=>{});
+    oscillators = SP.map((sp,i)=>{
+      if(i===1) return null; // 朱鹮用真实录音，跳过合成
+      let osc = audioCtx.createOscillator();
+      let gain = audioCtx.createGain();
+      osc.type = i===3?'sine':(i===2?'sawtooth':'triangle');
+      osc.frequency.value = FREQ[i];
+      gain.gain.value = 0;
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start();
+      return {osc,gain};
+    });
+  } else {
+    // 关闭合成音
+    oscillators.forEach(o=>{ if(o){ try{o.osc.stop();}catch(e){} } });
+    oscillators=[];
+    if(audioCtx){ audioCtx.close(); audioCtx=null; }
+    // 关闭所有真实录音
+    audBaiji.pause();    audBaiji.currentTime=0;
+    audIbis.pause();     audIbis.currentTime=0;
+    audForest.pause();   audForest.currentTime=0;
+    audCity.pause();     audCity.currentTime=0;
+    audCityBird.pause(); audCityBird.currentTime=0;
+    bgStarted = false;
+    cityLatch = false;
+  }
+}
+
+function updateSound(){
+
+  // ── 自然背景底音：森林风声（intro·resonance 全程轻声，disturb 后渐弱） ──
+  if(sndOn) startBgTracks();
+  let forestTarget = 0;
+  if(sndOn){
+    if(STATE==='intro') forestTarget = 0.16;
+    if(STATE==='resonance') forestTarget = 0.12;
+  }
+  audForest.volume = audForest.volume*.94 + forestTarget*.06;
+
+  // ── 城市噪声：S2失衡段 + 粒子被强烈干扰时叠入 ──
+  if(micLv > .22) cityLatch = true;
+  else if(micLv < .14) cityLatch = false;
+  const cityActive = sndOn && (STATE==='disturb' || (STATE==='endangered' && cityLatch));
+  let cityTarget = 0;
+  if(cityActive){
+    cityTarget = STATE==='disturb' ? 0.20 : Math.min(micLv*0.24, 0.16);
+  }
+  audCity.volume = audCity.volume*.94 + cityTarget*.06;
+
+  // ── 城市鸟鸣：S6结尾"选择"段，象征自然与人类共存的可能 ──
+  const cityBirdTarget = sndOn && STATE==='choice' ? 0.18 : 0;
+  audCityBird.volume = audCityBird.volume*.94 + cityBirdTarget*.06;
+
+  // ── 真实录音：白鳍豚（在S3·S4幽灵段落轻声播放） ──
+  const baijiActive = sndOn && (STATE==='extinct'||STATE==='endangered'||STATE==='hope');
+  if(baijiActive){
+    if(audBaiji.paused){ audBaiji.volume=0; audBaiji.play().catch(()=>{}); }
+    // 音量淡入
+    audBaiji.volume = Math.min(audBaiji.volume+0.003, 0.28);
+  } else {
+    // 淡出后暂停
+    if(!audBaiji.paused){
+      audBaiji.volume = Math.max(audBaiji.volume-0.008, 0);
+      if(audBaiji.volume<=0) audBaiji.pause();
+    }
+  }
+
+  // ── 真实录音：朱鹮（S4·S5·choice，音量随活跃度） ──
+  const ibisActive = sndOn && (STATE==='endangered'||STATE==='hope'||STATE==='choice');
+  if(ibisActive){
+    if(audIbis.paused){ audIbis.volume=0; audIbis.play().catch(()=>{}); }
+    let target = vit[1] * 0.42;
+    audIbis.volume = audIbis.volume * 0.94 + target * 0.06;
+  } else {
+    if(!audIbis.paused){
+      audIbis.volume = Math.max(audIbis.volume-0.01, 0);
+      if(audIbis.volume<=0) audIbis.pause();
+    }
+  }
+
+  // ── 合成音：其余物种 ──────────────────────────────
+  if(!sndOn||!oscillators.length||!audioCtx) return;
+  SP.forEach((sp,i)=>{
+    if(i===1||!oscillators[i]) return; // 朱鹮已用真实录音
+    let v = vit[i];
+    let g = oscillators[i].gain;
+    let target = (STATE==='endangered'||STATE==='choice') ? v*0.06 : 0;
+    target = Math.min(target, 0.08);
+    g.gain.setTargetAtTime(target, audioCtx.currentTime, 0.5);
+    let mod = FREQ_MOD[i];
+    let lfo = Math.sin(audioCtx.currentTime*mod.rate*Math.PI*2 + mod.phase);
+    let scale = 0.97 + v*0.06 + lfo*mod.depth;
+    oscillators[i].osc.frequency.setTargetAtTime(
+      FREQ[i] * scale,
+      audioCtx.currentTime, 0.35
+    );
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// p5.js 画布
+// ══════════════════════════════════════════════════════════════
+const N  = 420;   // 每物种粒子数
+const NE = 280;   // 每消亡物种粒子数
+const ST = 7;     // 采样步长
+
+let pg, groups=[], eGroups=[];
+let fontsReady = false;
+let buildQueued = false;
+
+new p5(p=>{
+
+  async function ensureFontsReady(){
+    if(fontsReady) return;
+    if(document.fonts && document.fonts.ready){
+      try{
+        if(document.fonts.load){
+          await Promise.allSettled([
+            document.fonts.load(`400 ${Math.max(24, p.width*0.03)}px "STSong"`),
+            document.fonts.load(`400 ${Math.max(24, p.width*0.03)}px "SimSun"`)
+          ]);
+        }
+        await document.fonts.ready;
+      }catch(e){}
+    }
+    fontsReady = true;
+  }
+
+  function queueBuild(){
+    if(buildQueued) return;
+    buildQueued = true;
+    ensureFontsReady().finally(()=>{
+      build();
+      buildQueued = false;
+    });
+  }
+
+  function sample(text,cx,cy,fs){
+    pg.clear(); pg.background(0);
+    pg.fill(255); pg.noStroke();
+    pg.textFont('STSong,SimSun,serif');
+    pg.textSize(fs); pg.textAlign(p.CENTER,p.CENTER);
+    pg.text(text,cx,cy); pg.loadPixels();
+    let pts=[]; let m=fs*1.4;
+    for(let x=cx-m;x<cx+m;x+=ST){
+      for(let y=cy-m;y<cy+m;y+=ST){
+        let xi=p.floor(x),yi=p.floor(y);
+        if(xi<0||xi>=p.width||yi<0||yi>=p.height) continue;
+        let idx=(xi+yi*p.width)*4;
+        if(pg.pixels[idx]>100) pts.push(p.createVector(x+p.random(-2,2),y+p.random(-2,2)));
+      }
+    }
+    if(!pts.length){
+      // 字体尚未完全可用时兜底，避免空采样导致粒子目标点无效
+      for(let i=0;i<160;i++) pts.push(p.createVector(cx+p.random(-m*.3,m*.3),cy+p.random(-m*.3,m*.3)));
+    }
+    return p.shuffle(pts);
+  }
+
+  function build(){
+    let fs=p.min(p.width,p.height)*0.11;
+    groups=[];
+    SP.forEach((sp,si)=>{
+      let cx=sp.z.x*p.width, cy=sp.z.y*p.height;
+      let pts=sample(sp.name,cx,cy,fs);
+      let [r,g,b]=sp.col;
+      let grp=[];
+      for(let i=0;i<N;i++){
+        let t=pts[i%pts.length];
+        grp.push({x:cx+p.random(-70,70),y:cy+p.random(-70,70),vx:0,vy:0,tx:t.x,ty:t.y,r,g,b,sz:p.random(1.2,2.8),no:p.random(10000)});
+      }
+      groups.push(grp);
+    });
+    eGroups=[];
+    EX.forEach((ex,ei)=>{
+      let cx=ex.z.x*p.width, cy=ex.z.y*p.height;
+      let pts=sample(ex.name,cx,cy,fs*0.85);
+      let [r,g,b]=ex.col;
+      let grp=[];
+      for(let i=0;i<NE;i++){
+        let t=pts[i%pts.length];
+        grp.push({x:p.random(p.width),y:p.random(p.height),vx:0,vy:0,tx:t.x,ty:t.y,r,g,b,sz:p.random(0.8,1.8),no:p.random(10000)});
+      }
+      eGroups.push(grp);
+    });
+  }
+
+  p.setup=()=>{
+    let c=p.createCanvas(p.windowWidth,p.windowHeight);
+    c.elt.id='p5c';
+    c.elt.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none;';
+    document.getElementById('cvs').replaceWith(c.elt);
+    p.colorMode(p.RGB,255); p.noStroke();
+    pg=p.createGraphics(p.width,p.height);
+    queueBuild();
+  };
+
+  p.draw=()=>{
+    p.background(5,5,10,26);
+
+    // ── 干扰计算 ─────────────────────────────────────
+    let dLv=0;
+    if(STATE==='disturb'){
+      let r2=document.getElementById('s2').getBoundingClientRect();
+      dLv=p.constrain(p.map(r2.top,p.height*.7,-p.height*.4,0,1.8),0,1.8);
+    } else if(STATE==='endangered'||STATE==='choice'){
+      if(micOn) dLv=p.map(micLv,0,.5,0,2,true);
+      else{
+        let mv=p.dist(p.mouseX,p.mouseY,p.pmouseX,p.pmouseY);
+        dLv=p.map(mv,0,22,0,1.4,true);
+        if(p.mouseIsPressed) dLv=2.0;
+      }
+    }
+
+    // ── 活跃度更新 ───────────────────────────────────
+    if(dLv>.2){ silT=0;
+      SP.forEach((_,i)=>{ let d=p.map(i,0,4,.0005,.002)*dLv; vit[i]=p.max(0,vit[i]-d); });
+    } else {
+      silT+=p.deltaTime;
+      SP.forEach((_,i)=>{
+        let rate=(i===1&&silT>7000)?.0009:.0003;
+        vit[i]=p.min(1,vit[i]+rate);
+      });
+    }
+
+    // 消亡物种显示度
+    let showE=STATE==='extinct'||STATE==='endangered'||STATE==='hope'||STATE==='choice';
+    EX.forEach((_,i)=>{ let t=showE?.32:0; eVit[i]=eVit[i]*.994+t*.006; });
+
+    // 声音更新
+    updateSound();
+
+    // ── 绘制消亡物种（幽灵粒子，无法聚合） ──────────
+    eGroups.forEach((grp,ei)=>{
+      let ev=eVit[ei]; if(ev<.01) return;
+      let [r,g,b]=EX[ei].col;
+      grp.forEach(pt=>{
+        let dx=pt.tx-pt.x, dy=pt.ty-pt.y;
+        pt.vx+=dx*.006; pt.vy+=dy*.006;
+        // 强噪声使其永远无法稳定
+        let n=p.noise(pt.x*.005,pt.y*.005,p.frameCount*.009+pt.no);
+        let na=n*p.TWO_PI*2;
+        pt.vx+=p.cos(na)*1.1; pt.vy+=p.sin(na)*1.1;
+        pt.vx*=.89; pt.vy*=.89;
+        pt.x+=pt.vx; pt.y+=pt.vy;
+        let a=ev*70;
+        p.fill(r,g,b,a*.25); p.ellipse(pt.x,pt.y,pt.sz*4);
+        p.fill(r,g,b,a);     p.ellipse(pt.x,pt.y,pt.sz);
+      });
+    });
+
+    // ── 绘制存活物种 ─────────────────────────────────
+    if(STATE!=='intro'){
+      groups.forEach((grp,si)=>{
+        let v=vit[si];
+        grp.forEach(pt=>{
+          let dead=p.random()>v;
+          let dx=pt.tx-pt.x, dy=pt.ty-pt.y;
+          let d=p.sqrt(dx*dx+dy*dy);
+          pt.vx+=dx*(dead?.003:p.map(d,0,200,.014,.10));
+          pt.vy+=dy*(dead?.003:p.map(d,0,200,.014,.10));
+          if(dLv>.04){
+            let sx=micOn?p.width/2:p.mouseX, sy=micOn?p.height/2:p.mouseY;
+            let mdx=pt.x-sx, mdy=pt.y-sy;
+            let md=p.sqrt(mdx*mdx+mdy*mdy);
+            let rr=micOn?p.width*.55:165;
+            if(md<rr){ let rep=p.map(md,0,rr,13,0)*dLv; pt.vx+=(mdx/(md+1))*rep; pt.vy+=(mdy/(md+1))*rep; }
+          }
+          let n=p.noise(pt.x*.003,pt.y*.003,p.frameCount*.005+pt.no);
+          pt.vx+=p.cos(n*p.TWO_PI*2)*(dead?.65:.14);
+          pt.vy+=p.sin(n*p.TWO_PI*2)*(dead?.65:.14);
+          pt.vx*=.87; pt.vy*=.87;
+          let spd=p.sqrt(pt.vx*pt.vx+pt.vy*pt.vy);
+          if(spd>9){pt.vx*=9/spd;pt.vy*=9/spd;}
+          pt.x+=pt.vx; pt.y+=pt.vy;
+          let ht=(1-v)*46;
+          let al=p.constrain(p.map(spd,0,9,200,50)*v,12,255);
+          let cr=p.constrain(pt.r+ht,0,255), cg=p.constrain(pt.g-ht*.7,0,255), cb=p.constrain(pt.b-ht*.9,0,255);
+          p.fill(cr,cg,cb,al*.18); p.ellipse(pt.x,pt.y,pt.sz*5);
+          p.fill(cr,cg,cb,al);     p.ellipse(pt.x,pt.y,pt.sz);
+        });
+      });
+    }
+
+    // ── 白鳍豚注记 ───────────────────────────────────
+    if(vit[3]<.55&&STATE!=='intro'){
+      let a=p.map(vit[3],.55,.08,0,150,true);
+      p.fill(160,195,255,a); p.textSize(11); p.textFont('sans-serif');
+      p.textAlign(p.LEFT,p.BOTTOM);
+      p.text('白鳍豚 · 长江 · 2006年 · 已功能性灭绝',28,p.height-88);
+    }
+
+    // ── 干扰强度条 ───────────────────────────────────
+    if(dLv>.04){
+      let bh=p.map(dLv,0,2,0,90);
+      p.fill(255,255,255,18); p.rect(p.width-15,p.height/2-45,5,90,2);
+      p.fill(255,p.map(dLv,0,2,200,30),30,170);
+      p.rect(p.width-15,p.height/2+45-bh,5,bh,2);
+    }
+
+    // ── 朱鹮复苏提示 ─────────────────────────────────
+    if(vit[1]<.28&&silT>7500){
+      let a=p.map(silT,7500,12000,0,140,true);
+      p.fill(255,195,210,a); p.textSize(12); p.textAlign(p.CENTER,p.BOTTOM);
+      p.text('1981 · 洋县 · 7只 · 沉默是开始',p.width/2,p.height-55);
+    }
+
+    // ── 消亡结局叠层 ─────────────────────────────────
+    let ext=vit.filter(v=>v<.12).length;
+    if(ext>=4){
+      let a=p.map(ext,4,5,0,120,true);
+      p.fill(0,0,0,a);
+      p.rect(0,0,p.width,p.height);
+      p.fill(255,255,255,a*.7);
+      p.textSize(14); p.textAlign(p.CENTER,p.CENTER); p.textFont('STSong,SimSun,serif');
+      p.text('这不是未来\n这是部分物种的现在',p.width/2,p.height/2);
+      p.textSize(12); p.textFont('sans-serif');
+      p.fill(255,255,255,a*.4);
+      p.text('万物共鸣，不是比喻。独鸣或易，众方美丽。',p.width/2,p.height/2+60);
+    }
+  };
+
+  p.windowResized=()=>{
+    p.resizeCanvas(p.windowWidth,p.windowHeight);
+    pg=p.createGraphics(p.width,p.height);
+    queueBuild();
+  };
+});
+</script>
+</body>
+</html>

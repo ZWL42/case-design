@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>万物共鸣 v4 · 文字侵占与濒危生态交互体验</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+@font-face{
+  font-family:'YRDZ-Light';
+  src:url('../sours/YangRenDongZhuShiTi-Light-2.ttf') format('truetype');
+  font-weight:300;
+  font-style:normal;
+  font-display:swap;
+}
+html,body{height:100%;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+body{background:#05050a;color:#fff;font-family:'PingFang SC','Microsoft YaHei',sans-serif;overflow-x:auto;overflow-y:hidden;overscroll-behavior:none;touch-action:pan-x}
+#cvs{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+#story{position:relative;z-index:1;display:flex;flex-direction:row;height:100vh;width:max-content}
+.sec{min-width:100vw;min-height:100vh;flex:0 0 auto;display:flex;align-items:center;padding:0 7vw 92px}
+.sec.col{flex-direction:column;justify-content:center;text-align:center}
+.sec.right{justify-content:flex-end}
+.sec.center{justify-content:center}
+.card{max-width:420px;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);border-left:1px solid rgba(255,255,255,.1);padding:36px 32px}
+.card h2{font-family:'STSong','SimSun',serif;font-size:clamp(18px,2.4vw,28px);font-weight:300;letter-spacing:.25em;color:#fff;margin-bottom:18px}
+.card p{font-size:clamp(12px,1.4vw,14px);line-height:2;color:rgba(255,255,255,.6);margin-bottom:10px}
+.card em{color:rgba(255,160,100,.8);font-style:normal}
+.card .src{margin-top:18px;font-size:10px;color:rgba(255,255,255,.25);line-height:1.8}
+#s0{min-height:100vh;pointer-events:all}
+#s0 h1{font-family:'STSong','SimSun',serif;font-size:clamp(40px,9vw,110px);font-weight:200;letter-spacing:.55em;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:22px}
+#s0 .sub{font-size:clamp(11px,1.4vw,14px);letter-spacing:.3em;color:rgba(255,255,255,.28);margin-bottom:6px}
+.arrow{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.18);font-size:11px;letter-spacing:.2em;animation:blink 2.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.18}50%{opacity:.55}}
+.extinct-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:820px;width:100%;pointer-events:none}
+.ext-card{border:1px solid rgba(255,255,255,.07);padding:28px 22px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);position:relative;overflow:hidden}
+.ext-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center 40%;opacity:.2;filter:grayscale(1) contrast(1.05);pointer-events:none}
+.ext-card>*:not(.ext-bg){position:relative;z-index:1}
+.ext-card .ch{font-family:'STSong','SimSun',serif;font-size:30px;font-weight:300;color:rgba(255,255,255,.22);margin-bottom:6px}
+.ext-card .en{font-size:10px;color:rgba(255,255,255,.15);margin-bottom:10px;letter-spacing:.05em}
+.ext-card .yr{font-size:22px;color:rgba(220,80,80,.5);margin-bottom:14px}
+.ext-card .info{font-size:11px;color:rgba(255,255,255,.22);line-height:1.9}
+.sp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;max-width:860px;width:100%;pointer-events:none}
+.sp-card{border:1px solid rgba(255,255,255,.06);padding:22px 18px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);position:relative;overflow:hidden}
+.sp-card .ch{font-family:'STSong','SimSun',serif;font-size:22px;font-weight:300;margin-bottom:6px}
+.sp-card .st{font-size:10px;margin-bottom:10px;letter-spacing:.05em}
+.sp-card .dt{font-size:11px;color:rgba(255,255,255,.38);line-height:1.9}
+.sp-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center 25%;opacity:.14;filter:grayscale(1) contrast(1.1);pointer-events:none}
+.sp-card>*:not(.sp-bg){position:relative;z-index:1}
+.hope-inner{max-width:540px;text-align:center;pointer-events:none;border-top:1px solid rgba(255,195,210,.18);padding-top:40px}
+.hope-inner .num{font-family:'STSong','SimSun',serif;font-size:clamp(40px,7vw,80px);font-weight:200;color:rgba(255,195,210,.7);letter-spacing:.1em;margin-bottom:10px}
+.hope-inner h3{font-family:'STSong','SimSun',serif;font-size:clamp(16px,2vw,22px);font-weight:300;letter-spacing:.3em;margin-bottom:20px}
+.hope-inner p{font-size:13px;line-height:2.2;color:rgba(255,255,255,.55);margin-bottom:10px}
+#s6{pointer-events:all;cursor:default}
+#s6 .q{font-family:'STSong','SimSun',serif;font-size:clamp(16px,2.5vw,26px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.6);margin-bottom:18px}
+#s6 .tagline{font-size:13px;color:rgba(255,255,255,.25);letter-spacing:.2em}
+#bar{position:fixed;top:0;left:0;height:1px;background:rgba(255,255,255,.25);z-index:100;transition:width .1s}
+#restrain-count{position:fixed;bottom:86px;left:28px;z-index:50;font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.1em;pointer-events:none}
+#chapter-bar{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:120;width:min(1220px,95vw);height:56px;display:flex;align-items:flex-end;justify-content:center;gap:22px;padding:0 10px;pointer-events:all}
+#chapter-bar::before{content:'';position:absolute;left:0;right:0;bottom:12px;height:1px;z-index:0;background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.35),rgba(255,255,255,.08))}
+#chapter-bar::after{content:'';position:absolute;left:5%;right:5%;bottom:8px;height:22px;z-index:1;background:linear-gradient(180deg,rgba(5,5,10,0),rgba(5,5,10,.74) 68%,rgba(5,5,10,.88));filter:blur(5px);pointer-events:none}
+#chapter-bar .chap-btn{position:relative;z-index:2;border:0;background:transparent;color:rgba(255,255,255,.62);font-size:11px;letter-spacing:.16em;padding:0 8px 14px;cursor:pointer;opacity:.86;transform:translateY(3px);transition:opacity .22s,color .22s,transform .22s,text-shadow .22s}
+#chapter-bar .chap-btn::before{content:'';position:absolute;left:-8px;right:-8px;bottom:7px;height:18px;z-index:-1;background:linear-gradient(180deg,rgba(5,5,10,0),rgba(5,5,10,.72));filter:blur(3px);pointer-events:none}
+#chapter-bar .chap-btn::after{content:'';position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.25);transition:all .22s}
+#chapter-bar .chap-btn.active{color:rgba(255,255,255,.92);opacity:1;transform:translateY(0);text-shadow:0 0 12px rgba(255,255,255,.28)}
+#chapter-bar .chap-btn.active::after{width:6px;height:6px;background:rgba(255,255,255,.92);box-shadow:0 0 10px rgba(255,255,255,.35)}
+#chapter-bar .chap-btn:hover{opacity:.75;color:rgba(255,255,255,.75)}
+#chapter-bar .chap-btn.unreached{display:none}
+#end-btn{position:fixed;right:20px;bottom:16px;z-index:130;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.58);color:rgba(255,255,255,.72);font-size:11px;letter-spacing:.12em;padding:9px 13px;cursor:pointer;opacity:0;transform:translateY(6px);pointer-events:none;transition:all .22s}
+#end-btn:hover{color:#fff;border-color:rgba(255,255,255,.45)}
+#end-btn.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.streaming-ready{opacity:.02}
+#loading-hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.35);font-size:13px;letter-spacing:.2em;pointer-events:none;z-index:200;transition:opacity .8s}
+@media(max-width:767px){
+  .extinct-wrap{grid-template-columns:1fr}
+  .sp-grid{grid-template-columns:1fr 1fr}
+  .sp-card[style*="grid-column"]{grid-column:auto!important}
+  .card{max-width:90vw;padding:24px 20px}
+  #chapter-bar{width:96vw;height:52px;padding:0 2px;justify-content:center;gap:12px}
+  #chapter-bar .chap-btn{font-size:9px;letter-spacing:.1em;padding:0 2px 13px}
+  #end-btn{right:10px;bottom:10px;padding:8px 10px;font-size:10px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<canvas id="cvs"></canvas>
+<div id="loading-hint">正在加载...</div>
+<audio id="aud-baiji" src="../sours/sound/白鳍豚.mp3" loop preload="none"></audio>
+<audio id="aud-ibis" src="../sours/sound/朱鹮.mp3" loop preload="none"></audio>
+<div id="restrain-count"></div>
+
+<div id="story">
+
+<section id="s0" class="sec col" data-s="intro" style="position:relative">
+  <h1>万物共鸣</h1>
+  <p class="sub">中国濒危物种 · 视听觉交互体验设计</p>
+  <p style="font-size:10px;color:rgba(255,255,255,.15);letter-spacing:.2em">周小钧 · 广东白云学院 · 22数字媒体艺术1班</p>
+  <div class="arrow">→ &nbsp;向右滑动 &nbsp;→</div>
+</section>
+
+<section id="s1" class="sec" data-s="resonance" data-span-vw="150" style="align-items:flex-start;padding-top:25vh;margin-right:50vw">
+  <div class="card"><h2>亿万年的共鸣</h2>
+  <p>地球的声景从不属于任何单一的物种。鸟鸣、兽啸、水声、虫鸣——每一种生命都在发出自己的频率。</p>
+  <p>整个系统维持着周期性的稳定，<em>从未有哪一种声音彻底消失</em>。</p>
+  <p>背景中隐约浮现的文字，是人类最早的痕迹——稀疏、安静，与万物共处。</p>
+  <div class="src">数据来源：IUCN 全球物种红色名录 · 中国生物多样性监测与研究网络</div></div>
+</section>
+
+<section id="s2" class="sec right" data-s="disturb" data-span-vw="150" style="align-items:flex-start;padding-top:22vh;margin-right:50vw">
+  <div class="card"><h2>文字开始扩张</h2>
+  <p>工业革命之后，技术使生产规模突破了自然的缓冲边界。</p>
+  <p>观察背景——城市字符在密集生长，道路在铺设。文字所到之处，<em>生物让位</em>。</p>
+  <p>1900年至今，地球物种灭绝速度是自然灭绝速率的 <em>1000 倍</em>以上。</p>
+  <div class="src">来源：江建平等.中国两栖动物受威胁现状评估.生物多样性,2016</div></div>
+</section>
+
+<section id="s3" class="sec col" data-s="extinct" data-span-vw="190" style="justify-content:flex-start;padding-top:14vh;gap:50px;margin-right:90vw">
+  <div style="text-align:center;max-width:600px;pointer-events:none">
+    <h2 style="font-family:'STSong',serif;font-size:clamp(18px,2.5vw,28px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.65);margin-bottom:14px">他们已经离开了</h2>
+    <p style="font-size:12px;color:rgba(255,255,255,.3);line-height:2;letter-spacing:.06em">以下三种动物在中国境内已宣告灭绝或功能性灭绝</p>
+  </div>
+  <div class="extinct-wrap">
+    <div class="ext-card">
+      <img class="ext-bg" data-name="白鳍豚" alt="">
+      <div class="ch">白鳍豚</div><div class="en">Baiji · Lipotes vexillifer</div><div class="yr">2006</div>
+      <div class="info">功能性灭绝 · 曾栖居长江全流域 · 2500万年</div>
+    </div>
+    <div class="ext-card">
+      <img class="ext-bg" data-name="斑鳖" alt="">
+      <div class="ch">斑鳖</div><div class="en">Rafetus swinhoei</div><div class="yr">2019</div>
+      <div class="info">中国最后个体死亡 · 曾为世界最大淡水龟</div>
+    </div>
+    <div class="ext-card">
+      <img class="ext-bg" data-name="新疆虎" alt="">
+      <div class="ch">新疆虎</div><div class="en">Panthera tigris virgata</div><div class="yr">~1970s</div>
+      <div class="info">里海虎中国亚种 · 曾广布塔里木河流域</div>
+    </div>
+  </div>
+</section>
+
+<section id="s4" class="sec col" data-s="endangered" data-span-vw="260" style="justify-content:flex-start;padding-top:12vh;gap:40px;margin-right:160vw">
+  <div style="text-align:center;max-width:600px;pointer-events:none">
+    <h2 style="font-family:'STSong',serif;font-size:clamp(17px,2.3vw,26px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.65);margin-bottom:12px">还在呼吸的</h2>
+    <p style="font-size:12px;color:rgba(255,255,255,.28);letter-spacing:.1em;line-height:2.2">粒子聚合成它们的名字 · 文字侵占正在驱散这些轮廓<br><em style="color:rgba(255,195,210,.5);font-style:normal">点击画面，遏制扩张</em></p>
+  </div>
+  <div class="sp-grid">
+    <div class="sp-card"><img class="sp-bg" data-name="雪豹" alt=""><div class="ch" style="color:rgba(190,220,255,.75)">雪豹</div><div class="st" style="color:rgba(190,220,255,.4)">Snow Leopard · 极危</div><div class="dt">青藏高原 · 全球约4000只</div></div>
+    <div class="sp-card"><img class="sp-bg" data-name="朱鹮" alt=""><div class="ch" style="color:rgba(255,195,210,.75)">朱鹮</div><div class="st" style="color:rgba(255,195,210,.4)">Crested Ibis · 濒危</div><div class="dt">陕西洋县 · 1981年仅剩7只</div></div>
+    <div class="sp-card"><img class="sp-bg" data-name="扬子鳄" alt=""><div class="ch" style="color:rgba(140,215,170,.75)">扬子鳄</div><div class="st" style="color:rgba(140,215,170,.4)">Chinese Alligator · 极危</div><div class="dt">安徽 · 野外仅约120条</div></div>
+    <div class="sp-card" style="grid-column:1/3"><img class="sp-bg" data-name="长江江豚" alt="" style="object-position:center 40%"><div class="ch" style="color:rgba(160,195,255,.75)">长江江豚</div><div class="st" style="color:rgba(160,195,255,.4)">Yangtze Porpoise · 极危</div><div class="dt">长江全流域 · 约1249头</div></div>
+    <div class="sp-card"><img class="sp-bg" data-name="华南虎" alt=""><div class="ch" style="color:rgba(255,195,130,.75)">华南虎</div><div class="st" style="color:rgba(255,195,130,.4)">South China Tiger · 野外灭绝</div><div class="dt">华南南岭 · 圈养不足100只</div></div>
+  </div>
+</section>
+
+<section id="s5" class="sec center" data-s="hope" data-span-vw="120" style="margin-right:20vw">
+  <div class="hope-inner"><div class="num">7</div><h3>洋县，1981</h3>
+  <p>从 7 只到 2,000 只，中国用了 42 年。</p>
+  <p style="color:rgba(255,195,210,.55)">你的每一次点击，就像那个选择的缩影。</p></div>
+</section>
+
+<section id="s6" class="sec col" data-s="choice">
+  <p class="q">你想生活在一个什么样的声景里？</p>
+  <p class="tagline">独鸣或易，众方美丽</p>
+  <p style="margin-top:40px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.15em">《万物共鸣》· 周小钧 · 广东白云学院 · 2026</p>
+</section>
+
+</div>
+<div id="chapter-bar">
+  <button class="chap-btn active" data-go="s0" data-s="intro">序章</button>
+  <button class="chap-btn unreached" data-go="s1" data-s="resonance">共鸣</button>
+  <button class="chap-btn unreached" data-go="s2" data-s="disturb">扩张</button>
+  <button class="chap-btn unreached" data-go="s3" data-s="extinct">离开</button>
+  <button class="chap-btn unreached" data-go="s4" data-s="endangered">呼吸</button>
+  <button class="chap-btn unreached" data-go="s5" data-s="hope">希望</button>
+  <button class="chap-btn unreached" data-go="s6" data-s="choice">抉择</button>
+</div>
+<button id="end-btn" onclick="endExperience()">结束</button>
+
+<script>
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  一、设备检测与自适应常量                                      ║
+// ╚═══════════════════════════════════════════════════════════════╝
+const IS_MOBILE = window.innerWidth < 768;
+const BFS       = 18;
+const NP_BASE   = 140, NE_BASE = 60;
+const NP        = IS_MOBILE ? Math.round(NP_BASE * 0.55) : NP_BASE;   // 77 or 140
+const NE        = IS_MOBILE ? Math.round(NE_BASE * 0.55) : NE_BASE;   // 33 or 60
+const TRAIL_LEN = IS_MOBILE ? 3 : 5;        // 拖尾历史帧数
+const CONN_DIST = 18;                         // 连线距离阈值（世界坐标px）
+const CONN_SKIP = IS_MOBILE ? 999 : 0;        // 移动端跳过连线
+const MAX_RESTRAIN   = 15;                     // 遏制区上限
+const DEN_CACHE_INT  = 10;                     // 密度缓存刷新间隔帧
+const CHAR_WS  = BFS * 11;                     // 字形世界尺寸
+const PG_SZ    = 220;                          // 离屏采样尺寸
+const SAMP_ST  = 3;                            // 采样步长
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  二、全局状态                                                  ║
+// ╚═══════════════════════════════════════════════════════════════╝
+let STATE = 'intro';
+let civLevel = 0, civSmooth = 0;
+let silT = 0;
+let mouseNX = 0.5, mouseNY = 0.5; // 归一化鼠标位置(0~1)
+
+// 物种
+const SP = [
+  {name:'雪豹',   col:[190,220,255], lon:95,    lat:35,   gx:0,gy:0,wx:0,wy:0},
+  {name:'朱鹮',   col:[255,195,210], lon:107.5, lat:33.2, gx:0,gy:0,wx:0,wy:0},
+  {name:'扬子鳄', col:[140,215,170], lon:118,   lat:31,   gx:0,gy:0,wx:0,wy:0},
+  {name:'长江江豚',col:[160,195,255], lon:112,   lat:30,   gx:0,gy:0,wx:0,wy:0},
+  {name:'华南虎', col:[255,195,130], lon:113,   lat:25,   gx:0,gy:0,wx:0,wy:0},
+];
+const EX = [
+  {name:'白鳍豚', col:[140,170,210], lon:114,   lat:30.5, gx:0,gy:0,wx:0,wy:0},
+  {name:'斑鳖',   col:[150,195,155], lon:120,   lat:31,   gx:0,gy:0,wx:0,wy:0},
+  {name:'新疆虎', col:[195,165,125], lon:85,    lat:41,   gx:0,gy:0,wx:0,wy:0},
+];
+let vit  = SP.map(()=>1.0);
+let eVit = EX.map(()=>0.0);
+
+const restrainZones = [];
+let restrainCount = 0;
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  三、噪声                                                      ║
+// ╚═══════════════════════════════════════════════════════════════╝
+function _hash(x,y){let h=Math.imul(x,374761393)+Math.imul(y,668265263);h=Math.imul(h^(h>>>13),1274126177);return(h^(h>>>16))>>>0;}
+function rval(x,y){return _hash(x,y)/4294967296.0;}
+function _lerp(a,b,t){return a+t*(b-a);}
+function _ss(t){return t*t*(3-2*t);}
+function vnoise(x,y){let xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=_ss(xf),v=_ss(yf);return _lerp(_lerp(rval(xi,yi),rval(xi+1,yi),u),_lerp(rval(xi,yi+1),rval(xi+1,yi+1),u),v);}
+function fbm(x,y){return vnoise(x,y)+.5*vnoise(x*2,y*2)+.25*vnoise(x*4,y*4);}
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  四、地理网格                                                  ║
+// ╚═══════════════════════════════════════════════════════════════╝
+let maskData=null, maskW=2048, maskH=2048;
+let bounds={minLon:180,maxLon:-180,minLat:90,maxLat:-90};
+let centerLon=0, centerLat=0;
+let degX=0.15, degY=0.15;
+let geoReady=false;
+
+let GMIN_X=-220,GMAX_X=220,GMIN_Y=-210,GMAX_Y=210;
+let GW=0,GH=0;
+let landGrid, popGrid;
+
+const realCities=[
+  {lon:116.40,lat:39.90,w:1.0},{lon:117.20,lat:39.08,w:0.8},
+  {lon:121.47,lat:31.23,w:1.0},{lon:120.15,lat:30.28,w:0.8},
+  {lon:118.79,lat:32.06,w:0.8},{lon:113.26,lat:23.12,w:0.9},
+  {lon:114.05,lat:22.54,w:0.9},{lon:104.06,lat:30.65,w:0.8},
+  {lon:106.50,lat:29.53,w:0.8},{lon:114.30,lat:30.59,w:0.8},
+  {lon:108.94,lat:34.26,w:0.7},{lon:113.62,lat:34.74,w:0.7},
+  {lon:112.93,lat:28.22,w:0.7},{lon:123.42,lat:41.80,w:0.6},
+  {lon:117.00,lat:36.65,w:0.6},{lon:117.22,lat:31.82,w:0.6},
+  {lon:119.30,lat:26.07,w:0.6},{lon:126.63,lat:45.75,w:0.5},
+  {lon:102.71,lat:25.04,w:0.5},{lon:87.61, lat:43.79,w:0.4},
+  {lon:103.83,lat:36.06,w:0.4},{lon:111.67,lat:40.81,w:0.4},
+  {lon:108.32,lat:22.81,w:0.5},{lon:106.71,lat:26.57,w:0.5},
+  {lon:125.32,lat:43.81,w:0.5},{lon:118.08,lat:24.47,w:0.6},
+  {lon:120.38,lat:36.06,w:0.6},{lon:121.61,lat:38.91,w:0.5}
+];
+
+const charsAncient=['人','火','石','木','水','土','山','田','日','月'];
+const charsBorder =['界','疆','防','戍','卫','卡','哨','线'];
+const charsCity   =['城','网','市','电','芯','车','楼','算','厂','码'];
+const charsRural  =['乡','镇','村','农','田','路','舍','渠','集','桥'];
+const charsNature =['林','森','野','山','谷','川','渊','莽'];
+
+// 序章：连续“平面字符”浪潮（两三字高权重）+ 粒子避让字符面
+const introWords2 = [
+  '工地','楼群','人流','路网','施工','扩张','开发','占有','平台','算法',
+  '数据','资本','商圈','车流','通勤','夜班','产线','园区','并网','调度',
+  '订单','分发','系统','控制','厂区','物流','广告','灯牌','轨道','电网'
+];
+const introWords3 = [
+  '城市化','工业化','平台化','数据流','人群像','通勤线','高架桥','施工线',
+  '扩建区','开发带','物流链','供应链','算法流','资本流','订单流','调度网',
+  '商圈化','夜经济','新园区','并网区'
+];
+const introWordsLong = [
+  '现代化扩建','平台算法调度','城市更新带','人类活动场','开发占有区','资本回路网'
+];
+const INTRO_GRID_STEP = IS_MOBILE ? 16 : 18;
+const INTRO_TEXT_X_STEP = INTRO_GRID_STEP * 0.86; // 轻微收紧字间距（横向）
+const INTRO_PARTICLE_COUNT = IS_MOBILE ? 260 : 520;
+const INTRO_TEXT_SCROLL_SPEED = 0.55;        // 文字刷新速度（约 PPT 节奏）
+const INTRO_TEXT_EDGE_THRESHOLD = 0.92;      // 文字面硬边阈值（越大边缘越硬）
+const INTRO_PARTICLE_MIN_RATIO = 0.2;        // 最低保留粒子比例
+const INTRO_PARTICLE_HIT_EXPAND = 0.3;       // 粒子碰字消失范围扩展（相对阈值）
+const INTRO_PARTICLE_FLOW_GAIN = 0.048;      // 粒子横向潮流驱动力（较上一版降低约80%）
+const INTRO_PARTICLE_FORCE_SCALE = 0.2;      // 粒子整体流动力缩放（20%）
+const INTRO_PARTICLE_CHAOS = 1.9;            // 粒子混乱度
+const INTRO_PARTICLE_RANDOM_KICK = 0.03;     // 粒子随机冲量
+let introParticles = [];
+let introLayoutW = 0, introLayoutH = 0;
+let introRuns = { top:'', bottom:'' };
+let introSeeds = { top:0, bottom:0 };
+let introTextCoverage = 0;
+let introTargetParticles = INTRO_PARTICLE_COUNT;
+
+function pickIntroWord() {
+  let r = Math.random();
+  if (r < 0.58) return introWords2[Math.floor(Math.random() * introWords2.length)];
+  if (r < 0.92) return introWords3[Math.floor(Math.random() * introWords3.length)];
+  return introWordsLong[Math.floor(Math.random() * introWordsLong.length)];
+}
+
+function buildIntroRun(targetChars) {
+  let s = '';
+  while (s.length < targetChars) s += pickIntroWord();
+  return s;
+}
+
+function resetIntroVisuals(w, h) {
+  introLayoutW = w;
+  introLayoutH = h;
+  introParticles = [];
+  let hChars = Math.max(300, Math.ceil(w / INTRO_GRID_STEP) * 18);
+  introRuns = {
+    top: buildIntroRun(hChars),
+    bottom: buildIntroRun(hChars)
+  };
+  introSeeds = {
+    top: Math.random() * 1000,
+    bottom: Math.random() * 1000
+  };
+  for (let i = 0; i < INTRO_PARTICLE_COUNT; i++) {
+    introParticles.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.2,
+      seed: Math.random() * 1000,
+      r: 0.8 + Math.random() * 1.6,
+      hide: 0
+    });
+  }
+}
+
+function ensureIntroVisuals(w, h) {
+  if (!introParticles.length || !introRuns.top) {
+    resetIntroVisuals(w, h);
+    return;
+  }
+  if (Math.abs(w - introLayoutW) > 6 || Math.abs(h - introLayoutH) > 6) {
+    resetIntroVisuals(w, h);
+  }
+}
+
+function introEdgeField(x, y, w, h, timeSec) {
+  let surge = Math.pow(0.5 + 0.5 * Math.sin(timeSec * 0.2 + 1.1), 1.9);
+  let merge = 0.5 + 0.5 * Math.sin(timeSec * 0.14 + 0.4);
+  // 仅保留上下潮汐起点，并增强边缘波浪起伏
+  let topWave = Math.sin(timeSec * 0.62 + x * 0.012 + 0.6) * 0.65 + Math.sin(timeSec * 0.34 + x * 0.024 + 1.4) * 0.35;
+  let botWave = Math.sin(timeSec * 0.58 + x * 0.011 + 2.2) * 0.65 + Math.sin(timeSec * 0.31 + x * 0.022 + 2.9) * 0.35;
+  let topD = h * (0.09 + surge * 0.18) + (0.5 + 0.5 * topWave) * 58 + merge * 30;
+  let botD = h * (0.09 + surge * 0.18) + (0.5 + 0.5 * botWave) * 58 + merge * 30;
+  let cx = w * 0.5, cy = h * 0.5;
+  let holeRx = w * (0.28 - surge * 0.08);
+  let holeRy = h * (0.24 - surge * 0.1);
+  let dx = x - cx, dy = y - cy;
+  let inHole = ((dx * dx) / (holeRx * holeRx) + (dy * dy) / (holeRy * holeRy)) < 1;
+  let sTop = topD - y;
+  let sBottom = y - (h - botD);
+  return { sTop, sBottom, inHole };
+}
+
+function runChar(run, idx) {
+  if (!run || !run.length) return ' ';
+  let i = Math.floor(idx) % run.length;
+  if (i < 0) i += run.length;
+  return run.charAt(i);
+}
+
+function renderIntroTide(ctx, timeSec, dt, w, h) {
+  ensureIntroVisuals(w, h);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${INTRO_GRID_STEP * 0.9}px "YRDZ-Light",SimHei,"PingFang SC","Microsoft YaHei",sans-serif`;
+  let totalCells = 0;
+  let textCells = 0;
+  for (let y = INTRO_GRID_STEP * 0.65; y < h; y += INTRO_GRID_STEP) {
+    for (let x = INTRO_TEXT_X_STEP * 0.6; x < w; x += INTRO_TEXT_X_STEP) {
+      totalCells++;
+      let f = introEdgeField(x, y, w, h, timeSec);
+      if (f.inHole) continue;
+      let best = f.sTop, side = 'top';
+      if (f.sBottom > best) { best = f.sBottom; side = 'bottom'; }
+      if (best <= INTRO_GRID_STEP * INTRO_TEXT_EDGE_THRESHOLD) continue;
+      textCells++;
+
+      let row = Math.floor(y / INTRO_GRID_STEP);
+      let col = Math.floor(x / INTRO_TEXT_X_STEP);
+      let flow = 0;
+      // 文字运动改为上下向（time 速度降为原来的约20%）
+      if (side === 'top') flow = col * 3 + (row + timeSec * INTRO_TEXT_SCROLL_SPEED) * 7 + introSeeds.top;
+      else flow = col * 3 + (row - timeSec * INTRO_TEXT_SCROLL_SPEED * 1.08) * 7 + introSeeds.bottom;
+      let ch = runChar(introRuns[side], flow);
+      // 硬边字符面：不使用深度渐变，直接以字符块呈现
+      let tone = side === 'top' ? 116 : 120;
+      let alpha = side === 'top' ? 0.138 : 0.146;
+      ctx.fillStyle = `rgba(${tone},${tone},${tone},${alpha})`;
+      ctx.fillText(ch, x, y);
+    }
+  }
+  introTextCoverage = totalCells > 0 ? Math.max(0, Math.min(1, textCells / totalCells)) : 0;
+  let minCount = Math.round(INTRO_PARTICLE_COUNT * INTRO_PARTICLE_MIN_RATIO);
+  let desired = Math.round(INTRO_PARTICLE_COUNT * (1 - introTextCoverage * 0.9));
+  introTargetParticles = Math.max(minCount, Math.min(INTRO_PARTICLE_COUNT, desired));
+  ctx.restore();
+}
+
+function renderIntroParticles(ctx, timeSec, dt, w, h) {
+  ensureIntroVisuals(w, h);
+  ctx.save();
+  let tideLR = Math.sin(timeSec * 0.2 + 1.1);   // 与潮汐同频的左右流向
+  let hitThreshold = INTRO_GRID_STEP * Math.max(0.2, INTRO_TEXT_EDGE_THRESHOLD - INTRO_PARTICLE_HIT_EXPAND);
+  let nearThreshold = INTRO_GRID_STEP * Math.max(0.08, INTRO_TEXT_EDGE_THRESHOLD - INTRO_PARTICLE_HIT_EXPAND - 0.16);
+  introParticles.forEach((pt, i) => {
+    if (i >= introTargetParticles) {
+      if (Math.random() < 0.02) {
+        pt.x = w * (0.35 + Math.random() * 0.3);
+        pt.y = h * (0.35 + Math.random() * 0.3);
+        pt.vx = (Math.random() - 0.5) * 0.14;
+        pt.vy = (Math.random() - 0.5) * 0.14;
+      }
+      return;
+    }
+    let ox = pt.x, oy = pt.y;
+    let n = vnoise(pt.x * 0.003 + pt.seed + timeSec * 0.12, pt.y * 0.003 - timeSec * 0.1);
+    let n2 = vnoise(pt.x * 0.0024 - timeSec * 0.09, pt.y * 0.0036 + pt.seed * 0.3 + timeSec * 0.14);
+    let ang = n * Math.PI * 4;
+    let chaosF = INTRO_PARTICLE_FORCE_SCALE * INTRO_PARTICLE_CHAOS;
+    pt.vx += Math.cos(ang) * 0.05 * chaosF + (n2 - 0.5) * 0.06 * chaosF;
+    pt.vy += Math.sin(ang) * 0.035 * chaosF + (n - 0.5) * 0.05 * chaosF;
+    // 主流向统一横向：随潮汐左/右摆动
+    let streamVar = 0.72 + 0.55 * (0.5 + 0.5 * Math.sin(pt.seed * 1.3 + timeSec * 0.9));
+    pt.vx += tideLR * INTRO_PARTICLE_FLOW_GAIN * streamVar;
+    pt.vy += Math.sin(timeSec * 0.7 + pt.seed) * 0.012 * chaosF;
+    if (Math.random() < 0.028) {
+      pt.vx += (Math.random() - 0.5) * INTRO_PARTICLE_RANDOM_KICK * INTRO_PARTICLE_CHAOS;
+      pt.vy += (Math.random() - 0.5) * INTRO_PARTICLE_RANDOM_KICK * INTRO_PARTICLE_CHAOS;
+    }
+
+    let f = introEdgeField(pt.x, pt.y, w, h, timeSec);
+    if (!f.inHole) {
+      if (f.sTop > 0) pt.vy += Math.min(1.2, f.sTop / 26) * INTRO_PARTICLE_FORCE_SCALE;
+      if (f.sBottom > 0) pt.vy -= Math.min(1.2, f.sBottom / 26) * INTRO_PARTICLE_FORCE_SCALE;
+    }
+
+    pt.vx *= 0.88;
+    pt.vy *= 0.86;
+    let sp = Math.hypot(pt.vx, pt.vy);
+    if (sp > 1.2) {
+      pt.vx = pt.vx / sp * 1.2;
+      pt.vy = pt.vy / sp * 1.2;
+    }
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    if (pt.x < -20) pt.x = w + 20;
+    if (pt.x > w + 20) pt.x = -20;
+    if (pt.y < -20) pt.y = h + 20;
+    if (pt.y > h + 20) pt.y = -20;
+
+    // 碰到文字面即消失（并回到中心空区等待再次流出）
+    let hitF = introEdgeField(pt.x, pt.y, w, h, timeSec);
+    let hitBest = Math.max(hitF.sTop, hitF.sBottom);
+    if (!hitF.inHole && hitBest > hitThreshold) {
+      pt.hide = 1;
+      pt.x = w * (0.42 + Math.random() * 0.16);
+      pt.y = h * (0.42 + Math.random() * 0.16);
+      pt.vx = (Math.random() - 0.5) * 0.12;
+      pt.vy = (Math.random() - 0.5) * 0.12;
+      return;
+    }
+    if (pt.hide > 0.01) {
+      pt.hide *= 0.82;
+      return;
+    } else {
+      pt.hide = 0;
+    }
+
+    let tw = 0.032 + (0.5 + 0.5 * Math.sin(timeSec * 1.1 + pt.seed)) * 0.058;
+    let tone = 136;
+    let nearText = !hitF.inHole && hitBest > nearThreshold;
+    // 靠近文字面不画拖线，减少“粒子连成线”观感
+    if (!nearText) {
+      ctx.strokeStyle = `rgba(${tone},${tone},${tone},${tw * 0.52})`;
+      ctx.lineWidth = 0.72;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(pt.x, pt.y);
+      ctx.stroke();
+    }
+
+    let pulse = 0.7 + 0.55 * (0.5 + 0.5 * Math.sin(timeSec * 2.2 + pt.seed * 1.7 + pt.x * 0.01));
+    let pr = pt.r * pulse;
+    ctx.fillStyle = `rgba(${tone + 10},${tone + 10},${tone + 10},${tw + 0.038})`;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pr, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function geoToGrid(lon,lat){return{gx:Math.round((lon-centerLon)/degX),gy:Math.round((centerLat-lat)/degY)};}
+function gridIdx(gx,gy){
+  let lx=gx-GMIN_X,ly=gy-GMIN_Y;
+  if(lx<0||lx>=GW||ly<0||ly>=GH) return -1;
+  return ly*GW+lx;
+}
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  五、密度缓存系统（废除逐帧逐粒子计算）                        ║
+// ╚═══════════════════════════════════════════════════════════════╝
+let denCache = null;         // Float32Array[GW*GH] — 含遏制区的最终密度
+let denCacheFrame = -999;
+
+// 刷新密度缓存：先算基础密度（civSmooth + pop），再叠加遏制区衰减
+function refreshDenCache(frameCount) {
+  if (!geoReady) return;
+  if (denCache && frameCount - denCacheFrame < DEN_CACHE_INT) return;
+  denCacheFrame = frameCount;
+  if (!denCache) denCache = new Float32Array(GW * GH);
+
+  let cl = civSmooth;
+  // 第一轮：基础密度（只依赖 civSmooth 和 popGrid）
+  for (let i = 0, len = GW * GH; i < len; i++) {
+    if (!landGrid[i]) { denCache[i] = 0; continue; }
+    let pop = popGrid[i];
+    if (cl < 0.01) { denCache[i] = 0; continue; }
+    if (cl < 0.2)  { denCache[i] = pop > 0.6 ? cl * pop * 0.5 : 0; continue; }
+    if (cl < 0.7)  { let e = (cl - 0.2) / 0.5; denCache[i] = pop > (0.6 - e * 0.5) ? e * pop : 0; continue; }
+    let s = (cl - 0.7) / 0.3;
+    denCache[i] = Math.min(1, pop * (0.5 + s * 0.5) + s * 0.08);
+  }
+
+  // 第二轮：遏制区衰减（只遍历影响范围内的格子）
+  for (let z of restrainZones) {
+    if (z.life <= 0) continue;
+    let rg = Math.ceil(z.radius / BFS) + 1;
+    let zgx = Math.round(z.wx / BFS), zgy = Math.round(z.wy / BFS);
+    let x0 = Math.max(0, zgx - rg - GMIN_X), x1 = Math.min(GW - 1, zgx + rg - GMIN_X);
+    let y0 = Math.max(0, zgy - rg - GMIN_Y), y1 = Math.min(GH - 1, zgy + rg - GMIN_Y);
+    for (let ly = y0; ly <= y1; ly++) {
+      for (let lx = x0; lx <= x1; lx++) {
+        let idx = ly * GW + lx;
+        if (denCache[idx] < 0.005) continue;
+        let wx = (lx + GMIN_X) * BFS, wy = (ly + GMIN_Y) * BFS;
+        let dx = wx - z.wx, dy = wy - z.wy;
+        let d = Math.sqrt(dx * dx + dy * dy);
+        if (d < z.radius) denCache[idx] *= Math.max(0, d / z.radius);
+      }
+    }
+  }
+}
+
+// O(1) 密度查询
+function cachedDen(gx, gy) {
+  let idx = gridIdx(gx, gy);
+  return (idx >= 0 && denCache) ? denCache[idx] : 0;
+}
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  六、地理数据加载                                              ║
+// ╚═══════════════════════════════════════════════════════════════╝
+async function initGeoData() {
+  try {
+    const res = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000.json');
+    const geojson = await res.json();
+    const polygons = [];
+    geojson.features.forEach(feat => {
+      if (!feat.geometry) return;
+      let polys = feat.geometry.type === 'Polygon' ? [feat.geometry.coordinates[0]] :
+                  feat.geometry.type === 'MultiPolygon' ? feat.geometry.coordinates.map(c => c[0]) : [];
+      polys.forEach(poly => {
+        polygons.push(poly);
+        poly.forEach(([lon, lat]) => {
+          if (lon < bounds.minLon) bounds.minLon = lon; if (lon > bounds.maxLon) bounds.maxLon = lon;
+          if (lat < bounds.minLat) bounds.minLat = lat; if (lat > bounds.maxLat) bounds.maxLat = lat;
+        });
+      });
+    });
+    centerLon = (bounds.minLon + bounds.maxLon) / 2;
+    centerLat = (bounds.minLat + bounds.maxLat) / 2;
+    degY = degX * Math.cos(centerLat * Math.PI / 180);
+
+    const mc = document.createElement('canvas'); mc.width = maskW; mc.height = maskH;
+    const mx = mc.getContext('2d');
+    mx.fillStyle = '#F00';
+    polygons.forEach(poly => { mx.beginPath(); poly.forEach(([lon, lat], i) => { let x = (lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * maskW, y = (bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat) * maskH; i === 0 ? mx.moveTo(x, y) : mx.lineTo(x, y); }); mx.closePath(); mx.fill(); });
+    mx.lineWidth = 4; mx.strokeStyle = '#0F0';
+    polygons.forEach(poly => { mx.beginPath(); poly.forEach(([lon, lat], i) => { let x = (lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * maskW, y = (bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat) * maskH; i === 0 ? mx.moveTo(x, y) : mx.lineTo(x, y); }); mx.closePath(); mx.stroke(); });
+    maskData = mx.getImageData(0, 0, maskW, maskH);
+
+    GW = GMAX_X - GMIN_X; GH = GMAX_Y - GMIN_Y;
+    landGrid = new Uint8Array(GW * GH);
+    popGrid = new Float32Array(GW * GH);
+    for (let gy = GMIN_Y; gy < GMAX_Y; gy++) {
+      for (let gx = GMIN_X; gx < GMAX_X; gx++) {
+        let lon = centerLon + gx * degX, lat = centerLat - gy * degY;
+        let idx = (gy - GMIN_Y) * GW + (gx - GMIN_X);
+        if (lon < bounds.minLon || lon > bounds.maxLon || lat < bounds.minLat || lat > bounds.maxLat) continue;
+        let mmx = Math.floor((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * maskW);
+        let mmy = Math.floor((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat) * maskH);
+        mmx = Math.max(0, Math.min(maskW - 1, mmx)); mmy = Math.max(0, Math.min(maskH - 1, mmy));
+        let mi = (mmy * maskW + mmx) * 4;
+        let isLand = maskData.data[mi] > 128, isBorder = maskData.data[mi + 1] > 128;
+        if (!isLand && !isBorder) continue;
+        landGrid[idx] = isBorder ? 2 : 1;
+        let ci = 0;
+        for (let c of realCities) {
+          let dx = (lon - c.lon) * Math.cos(c.lat * Math.PI / 180), dy = lat - c.lat;
+          let d = Math.sqrt(dx * dx + dy * dy), r = 2.0 * c.w;
+          if (d < r) ci += Math.pow(1 - d / r, 2) * c.w;
+        }
+        let gw = Math.max(0, Math.min(1, (lon - 100) / 20));
+        let org = fbm(gx * 0.1, gy * 0.1) * 0.3; if (ci < 0.05) org *= gw;
+        popGrid[idx] = Math.min(1.0, ci + org);
+      }
+    }
+    [...SP, ...EX].forEach(sp => { let g = geoToGrid(sp.lon, sp.lat); sp.gx = g.gx; sp.gy = g.gy; sp.wx = g.gx * BFS; sp.wy = g.gy * BFS; });
+    geoReady = true;
+  } catch (e) { console.error('地理数据失败', e); }
+}
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  七、相机系统（弹簧阻尼 + 呼吸 + 视差）                        ║
+// ╚═══════════════════════════════════════════════════════════════╝
+const CAM_SPRING_K = 0.0016;  // 弹簧刚度
+const CAM_SPRING_D = 0.87;    // 阻尼系数(越小越快静止)
+const BREATH_AMP   = 1.8;     // 呼吸振幅(世界px)
+const PARALLAX_K   = 0.022;   // 视差灵敏度(±2.2%)
+
+let cam = { x:0, y:0, z:1, tx:0, ty:0, tz:1, vx:0, vy:0, vz:0 };
+
+function updateCamera(pw, ph, fc) {
+  if (!geoReady) return;
+  let mapW = GW * BFS, mapH = GH * BFS;
+  let fitZoom = Math.min(pw / mapW, ph / mapH) * 0.85;
+
+  // ── 目标计算 ──
+  if (STATE === 'intro' || STATE === 'resonance') { cam.tx = 0; cam.ty = 0; cam.tz = fitZoom; }
+  else if (STATE === 'disturb') { cam.tx = 0; cam.ty = 0; cam.tz = fitZoom * 1.1; }
+  else if (STATE === 'extinct') {
+    let pr = getSectionProgress('s3');
+    let ei = Math.min(2, Math.floor(pr * 3));
+    cam.tx = EX[ei].wx; cam.ty = EX[ei].wy; cam.tz = fitZoom * 3.2;
+  } else if (STATE === 'endangered') {
+    let pr = getSectionProgress('s4');
+    let si = Math.min(4, Math.floor(pr * 5));
+    cam.tx = SP[si].wx; cam.ty = SP[si].wy; cam.tz = fitZoom * 3.2;
+  } else if (STATE === 'hope') { cam.tx = SP[1].wx; cam.ty = SP[1].wy; cam.tz = fitZoom * 2.8; }
+  else if (STATE === 'choice') { cam.tx = 0; cam.ty = 0; cam.tz = fitZoom * 0.95; }
+
+  // ── 弹簧阻尼运动 ──
+  cam.vx = (cam.vx + (cam.tx - cam.x) * CAM_SPRING_K) * CAM_SPRING_D;
+  cam.vy = (cam.vy + (cam.ty - cam.y) * CAM_SPRING_K) * CAM_SPRING_D;
+  cam.vz = (cam.vz + (cam.tz - cam.z) * CAM_SPRING_K * 0.5) * CAM_SPRING_D;
+  cam.x += cam.vx;
+  cam.y += cam.vy;
+  cam.z += cam.vz;
+}
+
+// 叠加呼吸 + 视差后的显示坐标（不污染 cam.x/y/z）
+function displayCam(pw, ph) {
+  let t = Date.now() * 0.001;
+  // 呼吸：多频叠加 + 柏林噪声打破规律
+  let bx = Math.sin(t * 0.31) * BREATH_AMP + Math.sin(t * 0.17 + 1.7) * BREATH_AMP * 0.4;
+  let by = Math.sin(t * 0.23 + 1.3) * BREATH_AMP * 0.8 + Math.sin(t * 0.13 + 0.7) * BREATH_AMP * 0.3;
+  let bz = Math.sin(t * 0.19 + 2.1) * cam.z * 0.004;
+  // 柏林噪声层
+  let nx = vnoise(t * 0.12, 0) * BREATH_AMP * 0.6;
+  let ny = vnoise(0, t * 0.12) * BREATH_AMP * 0.5;
+
+  // 视差：光标位置偏移
+  let px = (mouseNX - 0.5) * PARALLAX_K * (pw / cam.z);
+  let py = (mouseNY - 0.5) * PARALLAX_K * (ph / cam.z);
+
+  return {
+    x: cam.x + bx + nx + px,
+    y: cam.y + by + ny + py,
+    z: cam.z + bz
+  };
+}
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  八、交互：click + touchstart + 遏制区管理                     ║
+// ╚═══════════════════════════════════════════════════════════════╝
+function handleRestrain(clientX, clientY) {
+  if (STATE !== 'endangered' && STATE !== 'hope' && STATE !== 'choice') return;
+  let dc = displayCam(window.innerWidth, window.innerHeight);
+  let sx = clientX - window.innerWidth / 2, sy = clientY - window.innerHeight / 2;
+  let wx = sx / dc.z + dc.x, wy = sy / dc.z + dc.y;
+  restrainZones.push({ wx, wy, radius: BFS * 8 + Math.random() * BFS * 4, life: 1.0, decay: 0.0004 });
+  restrainCount++;
+  // 超限清理最早的
+  while (restrainZones.length > MAX_RESTRAIN) restrainZones.shift();
+  document.getElementById('restrain-count').textContent = `遏制 ${restrainCount} 处`;
+}
+
+document.addEventListener('click', e => {
+  bootSoundOnce();
+  if (e.target.closest('#chapter-bar') || e.target.closest('.card')) return;
+  handleRestrain(e.clientX, e.clientY);
+});
+
+let tapStart = null;
+document.addEventListener('touchstart', e => {
+  bootSoundOnce();
+  if (e.target.closest('#chapter-bar') || e.target.closest('.card')) { tapStart = null; return; }
+  if (e.touches.length > 0) {
+    tapStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (!tapStart || e.changedTouches.length === 0) { tapStart = null; return; }
+  let x = e.changedTouches[0].clientX, y = e.changedTouches[0].clientY;
+  let d = Math.hypot(x - tapStart.x, y - tapStart.y);
+  let dt = Date.now() - tapStart.t;
+  if (d < 16 && dt < 280) handleRestrain(x, y);
+  tapStart = null;
+}, { passive: true });
+
+// 鼠标位置跟踪（视差用）
+document.addEventListener('mousemove', e => {
+  mouseNX = e.clientX / window.innerWidth;
+  mouseNY = e.clientY / window.innerHeight;
+});
+document.addEventListener('touchmove', e => {
+  if (e.touches.length > 0) {
+    mouseNX = e.touches[0].clientX / window.innerWidth;
+    mouseNY = e.touches[0].clientY / window.innerHeight;
+  }
+}, { passive: true });
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  九、滚动驱动叙事                                              ║
+// ╚═══════════════════════════════════════════════════════════════╝
+const secs = Array.from(document.querySelectorAll('[data-s]'));
+const chapBtns = Array.from(document.querySelectorAll('#chapter-bar .chap-btn'));
+const endBtn = document.getElementById('end-btn');
+const visitedStates = new Set(['intro']);
+const NO_BACK_SCROLL = true;
+const SNAP_ANIM_MS = 280;
+const TRACKPAD_GAIN = 2.9;
+const WHEEL_GAIN = 1.45;
+const GAIN_BASE_WIDTH = 1440;
+const GAIN_MIN_SCALE = 0.72;
+const WHEEL_DECAY = 0.84;
+const WHEEL_STOP_EPS = 0.05;
+const WHEEL_VEL_MAX = 92;
+let snapXs = [];
+let secAnchors = [];
+let secRanges = [];
+let snapIndex = 0;
+let settleTimer = null;
+let snapAnimRaf = 0;
+let autoScrolling = false;
+let lastWheelAt = 0;
+let wheelVelX = 0;
+let wheelRaf = 0;
+let maxReachedX = 0;
+let soundBooted = false;
+
+const audBaiji = document.getElementById('aud-baiji');
+const audIbis  = document.getElementById('aud-ibis');
+const CHAPTER_AUDIO = {
+  extinct: ['baiji'],
+  endangered: ['ibis']
+};
+
+function buildSnapXs() {
+  let maxScroll = Math.max(0, document.body.scrollWidth - window.innerWidth);
+  secAnchors = secs.map(sec => {
+    let x = Math.round(sec.offsetLeft);
+    return Math.max(0, Math.min(maxScroll, x));
+  });
+  // 章节断点只取页面起点，且单调不回退
+  for (let i = 1; i < secAnchors.length; i++) secAnchors[i] = Math.max(secAnchors[i], secAnchors[i - 1]);
+  if (secAnchors.length) secAnchors[secAnchors.length - 1] = maxScroll;
+  snapXs = [...new Set(secAnchors)];
+}
+
+function buildSecRanges() {
+  let maxScroll = Math.max(0, document.body.scrollWidth - window.innerWidth);
+  secRanges = secs.map((sec, i) => {
+    let start = secAnchors[i] ?? 0;
+    let end = i < secs.length - 1 ? (secAnchors[i + 1] ?? maxScroll) : maxScroll;
+    if (end < start) end = start;
+    return { sec, start, end };
+  });
+}
+
+function getSectionProgress(sectionId) {
+  if (!secRanges.length) return 0;
+  let idx = secs.findIndex(s => s.id === sectionId);
+  if (idx < 0) return 0;
+  let r = secRanges[idx];
+  let travel = Math.max(1, r.end - r.start);
+  return Math.max(0, Math.min(1, (window.scrollX - r.start) / travel));
+}
+
+function sectionByRange(x) {
+  if (!secRanges.length) return secs[0] || null;
+  for (let i = 0; i < secRanges.length; i++) {
+    let r = secRanges[i];
+    if (x >= r.start && x < r.end) return r.sec;
+  }
+  let last = secRanges[secRanges.length - 1];
+  if (x >= last.start) return last.sec;
+  let best = secRanges[0], bestD = Infinity;
+  secRanges.forEach(r => {
+    let d = Math.min(Math.abs(x - r.start), Math.abs(x - r.end));
+    if (d < bestD) { bestD = d; best = r; }
+  });
+  return best.sec;
+}
+
+function nearestSnapIndex(x) {
+  if (!snapXs.length) return 0;
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < snapXs.length; i++) {
+    let d = Math.abs(snapXs[i] - x);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+function cancelSnapAnim() {
+  if (snapAnimRaf) cancelAnimationFrame(snapAnimRaf);
+  snapAnimRaf = 0;
+  autoScrolling = false;
+}
+
+function pushWheelScroll(deltaX, velCap = WHEEL_VEL_MAX) {
+  lastWheelAt = performance.now();
+  wheelVelX = Math.max(-velCap, Math.min(velCap, wheelVelX + deltaX));
+  if (wheelRaf) return;
+  const tick = () => {
+    if (Math.abs(wheelVelX) < WHEEL_STOP_EPS) {
+      wheelVelX = 0;
+      wheelRaf = 0;
+      return;
+    }
+    window.scrollBy({ left: wheelVelX, top: 0, behavior: 'auto' });
+    wheelVelX *= WHEEL_DECAY;
+    wheelRaf = requestAnimationFrame(tick);
+  };
+  wheelRaf = requestAnimationFrame(tick);
+}
+
+function imageCandidates(name) {
+  const names = [name, encodeURIComponent(name)];
+  const roots = ['../sours/', './../sours/', '../../sours/', '../图片/', '图片/'];
+  const exts = ['jpg', 'jpeg', 'png', 'webp'];
+  const paths = [];
+  roots.forEach(root => {
+    names.forEach(n => {
+      exts.forEach(ext => paths.push(`${root}${n}.${ext}`));
+    });
+  });
+  return paths;
+}
+
+function setImgFallback(img, paths) {
+  let i = 0;
+  const next = () => {
+    if (i >= paths.length) return;
+    img.src = paths[i++];
+  };
+  img.onerror = next;
+  next();
+}
+
+function initBreathImageFallbacks() {
+  document.querySelectorAll('#s4 .sp-bg[data-name]').forEach(img => {
+    const name = img.getAttribute('data-name');
+    if (!name) return;
+    setImgFallback(img, imageCandidates(name));
+  });
+}
+
+function initExtinctImageFallbacks() {
+  const map = {
+    '白鳍豚': ['白鳍豚', '长江江豚'],
+    '斑鳖': ['斑鳖', '扬子鳄'],
+    '新疆虎': ['新疆虎', '华南虎']
+  };
+  document.querySelectorAll('#s3 .ext-bg[data-name]').forEach(img => {
+    const key = img.getAttribute('data-name');
+    const names = map[key] || [key];
+    let paths = [];
+    names.forEach(n => { paths.push(...imageCandidates(n)); });
+    setImgFallback(img, paths);
+  });
+}
+
+function bootSoundOnce() {
+  if (soundBooted) return;
+  soundBooted = true;
+  [audBaiji, audIbis].forEach(a => {
+    if (!a) return;
+    a.volume = 0;
+    a.play().catch(() => {});
+  });
+}
+
+function updateSpeciesAudio() {
+  if (!soundBooted) return;
+  const active = CHAPTER_AUDIO[STATE] || [];
+
+  const setAudioState = (audio, key, targetVol) => {
+    if (!audio) return;
+    if (active.includes(key)) {
+      if (audio.paused) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+      // 章节内平滑拉起音量
+      audio.volume = audio.volume * 0.82 + targetVol * 0.18;
+      return;
+    }
+    // 离开章节：立即结束该声音
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = 0;
+  };
+
+  setAudioState(audBaiji, 'baiji', 0.24);
+  setAudioState(audIbis, 'ibis', 0.18);
+}
+
+function animateScrollTo(targetX, duration = SNAP_ANIM_MS) {
+  cancelSnapAnim();
+  const startX = window.scrollX;
+  const dx = targetX - startX;
+  if (Math.abs(dx) < 1) {
+    window.scrollTo({ left: targetX, top: 0, behavior: 'auto' });
+    return;
+  }
+  autoScrolling = true;
+  const t0 = performance.now();
+  const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const step = now => {
+    const p = Math.min(1, (now - t0) / duration);
+    const x = startX + dx * easeInOut(p);
+    window.scrollTo({ left: x, top: 0, behavior: 'auto' });
+    if (p < 1) snapAnimRaf = requestAnimationFrame(step);
+    else { snapAnimRaf = 0; autoScrolling = false; }
+  };
+  snapAnimRaf = requestAnimationFrame(step);
+}
+
+function jumpToSnap(idx, smooth = true) {
+  if (!snapXs.length) return;
+  snapIndex = Math.max(0, Math.min(snapXs.length - 1, idx));
+  if (NO_BACK_SCROLL && snapXs[snapIndex] < maxReachedX) {
+    let fwd = snapXs.findIndex(x => x >= maxReachedX - 1);
+    if (fwd >= 0) snapIndex = fwd;
+    else snapIndex = snapXs.length - 1;
+  }
+  if (smooth) animateScrollTo(snapXs[snapIndex], SNAP_ANIM_MS);
+  else {
+    cancelSnapAnim();
+    window.scrollTo({ left: snapXs[snapIndex], top: 0, behavior: 'auto' });
+  }
+}
+
+function jumpToSection(si, smooth = true) {
+  if (!secAnchors.length) return;
+  let idx = Math.max(0, Math.min(secAnchors.length - 1, si));
+  let target = secAnchors[idx];
+  if (NO_BACK_SCROLL && target < maxReachedX) target = maxReachedX;
+  if (smooth) animateScrollTo(target, SNAP_ANIM_MS);
+  else {
+    cancelSnapAnim();
+    window.scrollTo({ left: target, top: 0, behavior: 'auto' });
+  }
+}
+
+function markVisited(stateName) {
+  if (!stateName) return;
+  visitedStates.add(stateName);
+}
+
+function updateChapterActive() {
+  chapBtns.forEach(btn => {
+    const reached = visitedStates.has(btn.dataset.s);
+    btn.classList.toggle('unreached', !reached);
+    btn.classList.toggle('active', reached && btn.dataset.s === STATE);
+  });
+  if (endBtn) endBtn.classList.toggle('show', STATE === 'choice');
+}
+
+function endExperience() {
+  cancelSnapAnim();
+  clearTimeout(settleTimer);
+  try { window.close(); } catch (e) {}
+  try { window.open('', '_self'); window.close(); } catch (e) {}
+  setTimeout(() => { window.location.href = 'about:blank'; }, 60);
+}
+
+function updateNarrativeByScroll() {
+  if (!secRanges.length) return;
+  let total = Math.max(1, document.body.scrollWidth - window.innerWidth);
+  let p = window.scrollX / total;
+  document.getElementById('bar').style.width = (p * 100) + '%';
+  let xMid = window.scrollX + window.innerWidth * 0.5;
+  let curSec = sectionByRange(xMid);
+  if (curSec && curSec.dataset.s !== STATE) STATE = curSec.dataset.s;
+  if (curSec) triggerSectionStream(curSec);
+  if (curSec && curSec.id === 's6') revealSectionImmediately(curSec);
+  markVisited(STATE);
+  updateChapterActive();
+  switch (STATE) {
+    case 'intro': civLevel = p * 1.5; break;
+    case 'resonance': civLevel = 0.05 + p * 0.8; break;
+    case 'disturb': civLevel = 0.2 + p * 1.2; break;
+    case 'extinct': civLevel = 0.85; break;
+    case 'endangered': civLevel = 0.95; break;
+    case 'hope': civLevel = 0.8; break;
+    case 'choice': civLevel = 0.65; break;
+  }
+  civLevel = Math.max(0, Math.min(1, civLevel));
+  snapIndex = nearestSnapIndex(window.scrollX);
+}
+
+window.addEventListener('scroll', () => {
+  if (NO_BACK_SCROLL) {
+    if (window.scrollX < maxReachedX - 1) {
+      window.scrollTo({ left: maxReachedX, top: 0, behavior: 'auto' });
+      return;
+    }
+    if (window.scrollX > maxReachedX) maxReachedX = window.scrollX;
+  }
+  updateNarrativeByScroll();
+  if (autoScrolling) return;
+  clearTimeout(settleTimer);
+  const idleFor = performance.now() - lastWheelAt;
+  const snapDelay = idleFor < 180 ? 290 : 170;
+  settleTimer = setTimeout(() => jumpToSnap(nearestSnapIndex(window.scrollX)), snapDelay);
+}, { passive: true });
+
+window.addEventListener('wheel', e => {
+  bootSoundOnce();
+  if (e.target.closest('#chapter-bar')) return;
+  if (Math.abs(e.deltaX) + Math.abs(e.deltaY) < 1) return;
+  e.preventDefault();
+  cancelSnapAnim();
+  clearTimeout(settleTimer);
+  let d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  if (NO_BACK_SCROLL && d < 0) return;
+  // 触控板（像素模式 + 小步长）放大比例更高，滚动更跟手
+  let isTrackpad = e.deltaMode === 0 && Math.abs(d) < 36;
+  let widthScale = Math.max(GAIN_MIN_SCALE, Math.min(1, window.innerWidth / GAIN_BASE_WIDTH));
+  let gain = (isTrackpad ? TRACKPAD_GAIN : WHEEL_GAIN) * widthScale;
+  let velCap = WHEEL_VEL_MAX * widthScale;
+  pushWheelScroll(d * gain, velCap);
+}, { passive: false });
+
+window.addEventListener('keydown', e => {
+  bootSoundOnce();
+  let next = null;
+  if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') next = 1;
+  if (e.key === 'ArrowLeft' || e.key === 'PageUp') next = -1;
+  if (next === null) return;
+  if (NO_BACK_SCROLL && next < 0) return;
+  e.preventDefault();
+  cancelSnapAnim();
+  jumpToSnap(nearestSnapIndex(window.scrollX) + next);
+});
+
+window.addEventListener('touchstart', () => {
+  cancelSnapAnim();
+  clearTimeout(settleTimer);
+}, { passive: true });
+
+chapBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('unreached')) return;
+    cancelSnapAnim();
+    let sec = document.getElementById(btn.dataset.go);
+    if (!sec) return;
+    let idx = secs.findIndex(s => s.id === sec.id);
+    if (idx < 0) return;
+    if (NO_BACK_SCROLL && (secAnchors[idx] ?? 0) < maxReachedX - 1) return;
+    jumpToSection(idx);
+  });
+});
+
+window.addEventListener('resize', () => {
+  buildSnapXs();
+  buildSecRanges();
+  jumpToSnap(nearestSnapIndex(window.scrollX), false);
+});
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  十、章节文字流式输出                                           ║
+// ╚═══════════════════════════════════════════════════════════════╝
+const STREAM_SELECTOR = 'h1,h2,h3,p,.sub,.src,.ch,.en,.yr,.info,.st,.dt,.num,.q,.tagline';
+
+function prepareStreamNode(el) {
+  if (el.dataset.streamReady === '1') return;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) { return node.nodeValue.trim().length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; }
+  });
+  let nodes = [], originals = [];
+  let cur;
+  while ((cur = walker.nextNode())) {
+    nodes.push(cur);
+    originals.push(cur.nodeValue);
+    cur.nodeValue = '';
+  }
+  if (!nodes.length) return;
+  el.dataset.streamReady = '1';
+  el.classList.add('streaming-ready');
+  el._stream = { nodes, originals, ni: 0, ci: 0, lastTs: 0, done: false, playing: false };
+}
+
+function playStreamNode(el, cps = 30) {
+  const st = el._stream;
+  if (!st || st.playing || st.done) return;
+  st.playing = true;
+  el.classList.remove('streaming-ready');
+  const stepMs = 1000 / cps;
+  function tick(ts) {
+    if (st.done) return;
+    if (!st.lastTs) st.lastTs = ts;
+    let elapsed = ts - st.lastTs;
+    let n = Math.floor(elapsed / stepMs);
+    if (n <= 0) { requestAnimationFrame(tick); return; }
+    st.lastTs += n * stepMs;
+    while (n-- > 0 && !st.done) {
+      let txt = st.originals[st.ni];
+      st.nodes[st.ni].nodeValue += txt.charAt(st.ci);
+      st.ci++;
+      if (st.ci >= txt.length) {
+        st.ni++;
+        st.ci = 0;
+        if (st.ni >= st.nodes.length) st.done = true;
+      }
+    }
+    if (!st.done) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function revealSectionImmediately(sec) {
+  let nodes = sec.querySelectorAll('[data-stream-node="1"]');
+  nodes.forEach(el => {
+    const st = el._stream;
+    if (!st) return;
+    if (!st.done) {
+      for (let i = 0; i < st.nodes.length; i++) st.nodes[i].nodeValue = st.originals[i];
+      st.ni = st.nodes.length;
+      st.ci = 0;
+      st.done = true;
+      st.playing = false;
+    }
+    el.classList.remove('streaming-ready');
+  });
+  sec.dataset.streamPlayed = '1';
+}
+
+function triggerSectionStream(sec) {
+  if (sec.dataset.streamPlayed === '1') return;
+  sec.dataset.streamPlayed = '1';
+  let nodes = sec.querySelectorAll('[data-stream-node="1"]');
+  nodes.forEach((el, i) => {
+    setTimeout(() => playStreamNode(el, IS_MOBILE ? 24 : 34), i * 70);
+  });
+}
+
+secs.forEach(sec => {
+  sec.querySelectorAll(STREAM_SELECTOR).forEach(el => {
+    prepareStreamNode(el);
+    if (el.dataset.streamReady === '1') el.dataset.streamNode = '1';
+  });
+});
+
+// 首屏立即展示
+let firstSec = document.getElementById('s0');
+if (firstSec) triggerSectionStream(firstSec);
+
+requestAnimationFrame(() => {
+  markVisited('intro');
+  initExtinctImageFallbacks();
+  initBreathImageFallbacks();
+  buildSnapXs();
+  buildSecRanges();
+  jumpToSnap(nearestSnapIndex(window.scrollX), false);
+  maxReachedX = window.scrollX;
+  updateNarrativeByScroll();
+  updateChapterActive();
+});
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  十一、p5.js 主程序                                            ║
+// ╚═══════════════════════════════════════════════════════════════╝
+let groups = [], eGroups = [];
+let pg = null;
+let fontsReady = false;
+
+new p5(p => {
+
+  // ── 字体预加载 ──
+  async function ensureFonts() {
+    if (fontsReady) return;
+    try {
+      if (document.fonts && document.fonts.load) {
+        await Promise.allSettled([
+          document.fonts.load('300 160px "YRDZ-Light"'),
+          document.fonts.load('bold 160px "STSong"'),
+          document.fonts.load('bold 160px "SimSun"'),
+          document.fonts.load('bold 160px "SimHei"'),
+        ]);
+      }
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    } catch (e) {}
+    fontsReady = true;
+  }
+
+  // ── 字形采样 → 世界坐标偏移数组 ──
+  function sample(text) {
+    if (!pg) return fallbackOfs();
+    pg.clear(); pg.background(0); pg.fill(255); pg.noStroke();
+    pg.textFont('STSong,SimSun,serif');
+    pg.textSize(PG_SZ * 0.75);
+    pg.textAlign(p.CENTER, p.CENTER);
+    pg.text(text, PG_SZ / 2, PG_SZ / 2);
+    pg.loadPixels();
+    let pts = [];
+    for (let y = 0; y < PG_SZ; y += SAMP_ST) {
+      for (let x = 0; x < PG_SZ; x += SAMP_ST) {
+        if (pg.pixels[(x + y * PG_SZ) * 4] > 80)
+          pts.push({ ox: (x / PG_SZ - 0.5) * CHAR_WS, oy: (y / PG_SZ - 0.5) * CHAR_WS });
+      }
+    }
+    if (!pts.length) return fallbackOfs();
+    for (let i = pts.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); [pts[i], pts[j]] = [pts[j], pts[i]]; }
+    return pts;
+  }
+  function fallbackOfs() {
+    let pts = [];
+    for (let i = 0; i < 200; i++) pts.push({ ox: (Math.random() - .5) * CHAR_WS * .7, oy: (Math.random() - .5) * CHAR_WS * .7 });
+    return pts;
+  }
+
+  // ── 构建粒子 ──
+  function buildParticles() {
+    groups = [];
+    SP.forEach((sp) => {
+      let ofs = sample(sp.name), grp = [];
+      for (let i = 0; i < NP; i++) {
+        let o = ofs[i % ofs.length];
+        let tx = sp.wx + o.ox, ty = sp.wy + o.oy;
+        // 初始化拖尾历史 = 当前位置
+        let trail = [];
+        let ix = tx + p.random(-BFS * 1.5, BFS * 1.5), iy = ty + p.random(-BFS * 1.5, BFS * 1.5);
+        for (let t = 0; t < TRAIL_LEN; t++) trail.push({ x: ix, y: iy });
+        grp.push({
+          x: ix, y: iy, vx: p.random(-.3, .3), vy: p.random(-.3, .3),
+          tx, ty, sz: p.random(1.5, 3.5), no: p.random(10000),
+          alive: true, dying: false, deathT: 0, deathVx: 0, deathVy: 0,
+          stress: 0, trail, trailHead: 0
+        });
+      }
+      groups.push(grp);
+    });
+    eGroups = [];
+    EX.forEach((ex) => {
+      let ofs = sample(ex.name), grp = [];
+      for (let i = 0; i < NE; i++) {
+        let o = ofs[i % ofs.length];
+        let trail = [];
+        let ix = ex.wx + o.ox + p.random(-BFS * 3, BFS * 3), iy = ex.wy + o.oy + p.random(-BFS * 3, BFS * 3);
+        for (let t = 0; t < TRAIL_LEN; t++) trail.push({ x: ix, y: iy });
+        grp.push({
+          x: ix, y: iy, vx: 0, vy: 0,
+          tx: ex.wx + o.ox, ty: ex.wy + o.oy,
+          sz: p.random(0.8, 2.2), no: p.random(10000), phase: p.random(p.TWO_PI),
+          trail, trailHead: 0
+        });
+      }
+      eGroups.push(grp);
+    });
+  }
+
+  // ── setup ──
+  p.setup = () => {
+    let c = p.createCanvas(p.windowWidth, p.windowHeight);
+    c.elt.id = 'p5c';
+    c.elt.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none;';
+    document.getElementById('cvs').replaceWith(c.elt);
+    p.colorMode(p.RGB, 255); p.noStroke();
+    pg = p.createGraphics(PG_SZ, PG_SZ);
+
+    ensureFonts()
+      .then(() => initGeoData())
+      .then(() => {
+        buildParticles();
+        let hint = document.getElementById('loading-hint');
+        if (hint) { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 800); }
+      });
+  };
+
+  // ── draw ──
+  p.draw = () => {
+    p.background(5, 5, 10);
+    let fc = p.frameCount;
+    civSmooth += (civLevel - civSmooth) * 0.02;
+    updateSpeciesAudio();
+    let timeSec = Date.now() * 0.001;
+    let dt = Math.min(0.05, p.deltaTime / 1000 || 0.016);
+
+    if (STATE === 'intro') {
+      let ctx2 = p.drawingContext;
+      renderIntroTide(ctx2, timeSec, dt, p.width, p.height);
+      renderIntroParticles(ctx2, timeSec, dt, p.width, p.height);
+      return;
+    }
+
+    if (!geoReady) {
+      p.fill(255, 255, 255, 60); p.textAlign(p.CENTER, p.CENTER); p.textSize(13);
+      p.text('正在加载地理数据...', p.width / 2, p.height / 2);
+      return;
+    }
+
+    // 遏制区衰减
+    for (let i = restrainZones.length - 1; i >= 0; i--) {
+      restrainZones[i].life -= restrainZones[i].decay;
+      if (restrainZones[i].life <= 0) restrainZones.splice(i, 1);
+    }
+
+    // 密度缓存刷新
+    refreshDenCache(fc);
+
+    updateCamera(p.width, p.height, fc);
+
+    let dc = displayCam(p.width, p.height);
+
+    // 活跃度更新
+    SP.forEach((_, i) => {
+      let pressure = civSmooth * 0.25;
+      if (pressure > 0.08) { silT = 0; vit[i] = p.max(0.02, vit[i] - pressure * 0.0008); }
+      else {
+        silT += p.deltaTime;
+        let r = .0003;
+        for (let z of restrainZones) { let dd = Math.sqrt((SP[i].wx - z.wx) ** 2 + (SP[i].wy - z.wy) ** 2); if (dd < z.radius * 2) r += .001 * z.life; }
+        vit[i] = p.min(1, vit[i] + r);
+      }
+    });
+    let showE = STATE === 'extinct' || STATE === 'endangered' || STATE === 'hope' || STATE === 'choice';
+    EX.forEach((_, i) => { eVit[i] = eVit[i] * .993 + (showE ? .35 : 0) * .007; });
+
+    // ═════ 应用相机（使用含呼吸+视差的显示坐标）═════
+    let ctx = p.drawingContext;
+    p.push();
+    p.translate(p.width / 2, p.height / 2);
+    p.scale(dc.z);
+    p.translate(-dc.x, -dc.y);
+
+    // 视口范围
+    let vL = dc.x - p.width / (2 * dc.z), vR = dc.x + p.width / (2 * dc.z);
+    let vT = dc.y - p.height / (2 * dc.z), vB = dc.y + p.height / (2 * dc.z);
+    let c0 = Math.max(GMIN_X, Math.floor(vL / BFS) - 1), c1 = Math.min(GMAX_X - 1, Math.ceil(vR / BFS) + 1);
+    let r0 = Math.max(GMIN_Y, Math.floor(vT / BFS) - 1), r1 = Math.min(GMAX_Y - 1, Math.ceil(vB / BFS) + 1);
+    let renderSz = BFS * dc.z, useText = renderSz >= 5, time = Date.now();
+
+    // ═════ A. 文字侵占层（source-over 混合）═════
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let gy = r0; gy <= r1; gy++) {
+      for (let gx = c0; gx <= c1; gx++) {
+        let idx = gridIdx(gx, gy);
+        if (idx < 0 || !landGrid[idx]) continue;
+        let isBorder = landGrid[idx] === 2, pop = popGrid[idx];
+        let den = cachedDen(gx, gy);
+        if (den < 0.01) continue;
+        let px = gx * BFS + BFS / 2, py = gy * BFS + BFS / 2;
+        let ch = rval(gx, gy);
+        if (isBorder) {
+          let ci = Math.floor((time / 4000 + ch * 100)) % charsBorder.length;
+          let op = den * (0.4 + 0.3 * Math.sin(time / 2000 + ch * 5));
+          ctx.fillStyle = `rgba(180,180,180,${op})`;
+          if (useText) { ctx.font = `bold ${BFS * .85}px SimHei,sans-serif`; ctx.fillText(charsBorder[ci], px, py); }
+          else { ctx.fillRect(gx * BFS + BFS * .2, gy * BFS + BFS * .2, BFS * .6, BFS * .6); }
+        } else if (den > 0.5) {
+          let ci = Math.floor((time / 1500 + ch * 100)) % charsCity.length;
+          let op = 0.5 + den * 0.5;
+          ctx.fillStyle = `rgba(255,255,255,${op * (0.7 + 0.3 * Math.sin(time / 1000 + ch * 8))})`;
+          if (useText) { ctx.font = `${BFS * (0.5 + den * 0.3)}px SimHei,sans-serif`; ctx.fillText(charsCity[ci], px, py); }
+          else { ctx.fillRect(gx * BFS + 1, gy * BFS + 1, BFS - 2, BFS - 2); }
+        } else if (den > 0.15) {
+          if (ch < den * .7) {
+            let ci = Math.floor((time / 3500 + ch * 100)) % charsRural.length;
+            ctx.fillStyle = `rgba(200,200,200,${den * 0.6})`;
+            if (useText) { ctx.font = `${BFS * .7}px SimHei,sans-serif`; ctx.fillText(charsRural[ci], px, py); }
+            else { ctx.fillRect(gx * BFS + BFS * .25, gy * BFS + BFS * .25, BFS * .5, BFS * .5); }
+          }
+        } else if (den > 0.02) {
+          if (ch < den * 0.4) {
+            let chars = pop > 0.1 ? charsAncient : charsNature;
+            let ci = Math.floor((time / 6000 + ch * 100)) % chars.length;
+            ctx.fillStyle = `rgba(255,255,255,${den * 0.5})`;
+            if (useText) { ctx.font = `${BFS * .6}px STSong,SimSun,serif`; ctx.fillText(chars[ci], px, py); }
+          }
+        }
+      }
+    }
+
+    // ═════ B. 遏制光晕 ═════
+    for (let z of restrainZones) {
+      if (z.life <= 0) continue;
+      let grad = ctx.createRadialGradient(z.wx, z.wy, 0, z.wx, z.wy, z.radius);
+      let a = z.life * 0.12;
+      grad.addColorStop(0, `rgba(140,220,170,${a})`);
+      grad.addColorStop(0.6, `rgba(140,220,170,${a * .2})`);
+      grad.addColorStop(1, 'rgba(140,220,170,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(z.wx - z.radius, z.wy - z.radius, z.radius * 2, z.radius * 2);
+    }
+
+    // ═════ C. 切换到加色混合 → 粒子层 ═════
+    ctx.globalCompositeOperation = 'lighter';
+
+    // ── C1. 灭绝物种幽灵粒子 ──
+    eGroups.forEach((grp, ei) => {
+      let ev = eVit[ei]; if (ev < .01) return;
+      let [r, g, b] = EX[ei].col;
+
+      grp.forEach(pt => {
+        // 物理
+        let dx = pt.tx - pt.x, dy = pt.ty - pt.y;
+        pt.vx += dx * .004; pt.vy += dy * .004;
+        let n = p.noise(pt.x * .004, pt.y * .004, fc * .008 + pt.no);
+        pt.vx += p.cos(n * p.TWO_PI * 2) * 1.0; pt.vy += p.sin(n * p.TWO_PI * 2) * 1.0;
+        pt.vx *= .88; pt.vy *= .88;
+        pt.x += pt.vx; pt.y += pt.vy;
+
+        // 更新拖尾
+        pt.trail[pt.trailHead] = { x: pt.x, y: pt.y };
+        pt.trailHead = (pt.trailHead + 1) % TRAIL_LEN;
+
+        let fl = .5 + .5 * Math.sin(fc * .02 + pt.phase);
+        let a = ev * 50 * fl;
+
+        // 拖尾线段
+        ctx.strokeStyle = `rgba(${r},${g},${b},${a * 0.004})`;
+        ctx.lineWidth = pt.sz * 0.6;
+        ctx.beginPath();
+        for (let t = 0; t < TRAIL_LEN; t++) {
+          let ti = (pt.trailHead - 1 - t + TRAIL_LEN * 2) % TRAIL_LEN;
+          let tp = pt.trail[ti];
+          t === 0 ? ctx.moveTo(tp.x, tp.y) : ctx.lineTo(tp.x, tp.y);
+        }
+        ctx.stroke();
+
+        // 外晕 + 核心
+        ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.0015})`;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.sz * 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.008})`;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.sz, 0, Math.PI * 2); ctx.fill();
+      });
+    });
+
+    // ── C2. 存活物种粒子 ──
+    if (STATE !== 'intro') {
+      groups.forEach((grp, si) => {
+        let v = vit[si], [r, g, b] = SP[si].col;
+
+        // == 物理更新（全部粒子） ==
+        grp.forEach((pt, pi) => {
+          // 消散动画中的粒子
+          if (pt.dying) {
+            pt.deathT += 0.025;
+            pt.x += pt.deathVx; pt.y += pt.deathVy;
+            pt.deathVx *= 0.95; pt.deathVy *= 0.95;
+            if (pt.deathT >= 1) { pt.alive = false; pt.dying = false; }
+            return;
+          }
+          if (!pt.alive) return;
+
+          // ① 字形吸引
+          let dx = pt.tx - pt.x, dy = pt.ty - pt.y;
+          let d = Math.sqrt(dx * dx + dy * dy) + 0.001;
+          let pull = d > CHAR_WS * 0.3 ? p.map(d, CHAR_WS * .3, CHAR_WS * 2, .012, .06) : 0.004;
+          pull *= v;
+          pt.vx += dx * pull; pt.vy += dy * pull;
+
+          // ② 噪声漫游
+          let n1 = p.noise(pt.x * .004 + pt.no, pt.y * .004, fc * .003);
+          let n2 = p.noise(pt.x * .004, pt.y * .004 + pt.no, fc * .003 + 50);
+          pt.vx += (n1 - .5) * .25; pt.vy += (n2 - .5) * .25;
+
+          // ③ 同伴分离
+          let jS = Math.max(0, pi - 6), jE = Math.min(grp.length, pi + 6);
+          for (let j = jS; j < jE; j++) {
+            if (j === pi || !grp[j].alive || grp[j].dying) continue;
+            let fx = pt.x - grp[j].x, fy = pt.y - grp[j].y, fd = fx * fx + fy * fy;
+            let sep = BFS * 0.9;
+            if (fd < sep * sep && fd > .01) { let dd = Math.sqrt(fd); pt.vx += (fx / dd) * (1 - dd / sep) * .5; pt.vy += (fy / dd) * (1 - dd / sep) * .5; }
+          }
+
+          // ④ 文字密度排斥（查缓存，O(1)）
+          let pgx = Math.floor(pt.x / BFS), pgy = Math.floor(pt.y / BFS);
+          let fleeX = 0, fleeY = 0;
+          for (let dy2 = -2; dy2 <= 2; dy2++) {
+            for (let dx2 = -2; dx2 <= 2; dx2++) {
+              let ngx = pgx + dx2, ngy = pgy + dy2;
+              let den = cachedDen(ngx, ngy);
+              if (den < 0.025) continue;
+              let twx = ngx * BFS + BFS / 2, twy = ngy * BFS + BFS / 2;
+              let fx = pt.x - twx, fy = pt.y - twy;
+              let fd = Math.sqrt(fx * fx + fy * fy) + 0.1;
+              let falloff = 1 / (1 + fd / (BFS * 1.5));
+              let str = den * 3.8 * falloff;
+              fleeX += (fx / fd) * str; fleeY += (fy / fd) * str;
+            }
+          }
+          pt.vx += fleeX; pt.vy += fleeY;
+
+          // ⑤ 压力→脆弱消散
+          let hereDen = cachedDen(pgx, pgy);
+          if (hereDen > 0.04) pt.stress += hereDen * 0.12;
+          else pt.stress = Math.max(0, pt.stress - 0.03);
+          if (pt.stress > 10 && p.random() < 0.015 * (1 - v)) {
+            pt.dying = true; pt.deathT = 0;
+            pt.deathVx = pt.vx * 2.5 + (p.random() - .5) * 3;
+            pt.deathVy = pt.vy * 2.5 + (p.random() - .5) * 3;
+            return;
+          }
+
+          // 阻尼 + 速度限制
+          pt.vx *= .87; pt.vy *= .87;
+          let spd = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy);
+          if (spd > 6) { pt.vx *= 6 / spd; pt.vy *= 6 / spd; spd = 6; }
+          pt.x += pt.vx; pt.y += pt.vy;
+
+          // 更新拖尾
+          pt.trail[pt.trailHead] = { x: pt.x, y: pt.y };
+          pt.trailHead = (pt.trailHead + 1) % TRAIL_LEN;
+        });
+
+        // == 渲染（批量化）==
+        let alBase = v * 0.8;
+
+        // 拖尾线段（按年龄分层批量绘制）
+        for (let age = TRAIL_LEN - 2; age >= 0; age--) {
+          let fadeA = (1 - age / (TRAIL_LEN - 1)) * alBase;
+          if (fadeA < 0.002) continue;
+          ctx.strokeStyle = `rgba(${r},${g},${b},${fadeA * 0.22})`;
+          ctx.lineWidth = 1.2 - age * 0.15;
+          ctx.beginPath();
+          let hasSeg = false;
+          grp.forEach(pt => {
+            if (!pt.alive && !pt.dying) return;
+            let i0 = (pt.trailHead - 1 - age + TRAIL_LEN * 2) % TRAIL_LEN;
+            let i1 = (pt.trailHead - 2 - age + TRAIL_LEN * 2) % TRAIL_LEN;
+            let p0 = pt.trail[i0], p1 = pt.trail[i1];
+            ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+            hasSeg = true;
+          });
+          if (hasSeg) ctx.stroke();
+        }
+
+        // 连接线（星座/神经元质感）
+        if (CONN_SKIP === 0 && (fc + si) % 2 === 0) {
+          ctx.strokeStyle = `rgba(${r},${g},${b},${alBase * 0.08})`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          let hasCon = false;
+          for (let i = 0; i < grp.length; i++) {
+            let a = grp[i]; if (!a.alive || a.dying) continue;
+            for (let j = i + 1; j < Math.min(i + 10, grp.length); j++) {
+              let bb = grp[j]; if (!bb.alive || bb.dying) continue;
+              let ddx = a.x - bb.x, ddy = a.y - bb.y;
+              let dd = ddx * ddx + ddy * ddy;
+              if (dd < CONN_DIST * CONN_DIST) {
+                ctx.moveTo(a.x, a.y); ctx.lineTo(bb.x, bb.y);
+                hasCon = true;
+              }
+            }
+          }
+          if (hasCon) ctx.stroke();
+        }
+
+        // 外晕（批量）
+        ctx.fillStyle = `rgba(${r},${g},${b},${alBase * 0.018})`;
+        ctx.beginPath();
+        grp.forEach(pt => {
+          if (!pt.alive && !pt.dying) return;
+          if (pt.dying) {
+            let sz = pt.sz * (1 + pt.deathT * 5);
+            let da = (1 - pt.deathT) * 0.025;
+            // 消散粒子用独立样式——要结束当前批量，单独画
+            ctx.fill(); // 先flush外晕批量
+            ctx.fillStyle = `rgba(${r},${g},${b},${da})`;
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, sz * 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = `rgba(${Math.min(255, r + 40)},${Math.max(0, g - 20)},${Math.max(0, b - 40)},${da * 2})`;
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, sz, 0, Math.PI * 2); ctx.fill();
+            // 恢复外晕批量上下文
+            ctx.fillStyle = `rgba(${r},${g},${b},${alBase * 0.018})`;
+            ctx.beginPath();
+            return;
+          }
+          ctx.moveTo(pt.x + pt.sz * 4, pt.y);
+          ctx.arc(pt.x, pt.y, pt.sz * 4, 0, Math.PI * 2);
+        });
+        ctx.fill();
+
+        // 核心亮点（批量）
+        ctx.fillStyle = `rgba(${r},${g},${b},${alBase * 0.15})`;
+        ctx.beginPath();
+        grp.forEach(pt => {
+          if (!pt.alive || pt.dying) return;
+          let spd = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy);
+          let sz = pt.sz * (1 + spd * 0.04);
+          ctx.moveTo(pt.x + sz, pt.y);
+          ctx.arc(pt.x, pt.y, sz, 0, Math.PI * 2);
+        });
+        ctx.fill();
+
+        // 应激变色的高亮粒子（单独画有 stress 的）
+        grp.forEach(pt => {
+          if (!pt.alive || pt.dying || pt.stress < 2) return;
+          let s01 = Math.min(1, pt.stress / 8);
+          let cr = Math.min(255, r + s01 * 50), cg = Math.max(0, g - s01 * 35), cb2 = Math.max(0, b - s01 * 55);
+          let spd = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy);
+          let al = p.map(spd, 0, 6, 0.12, 0.04) * v * s01;
+          ctx.fillStyle = `rgba(${cr},${cg},${cb2},${al})`;
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.sz * 2, 0, Math.PI * 2); ctx.fill();
+        });
+      });
+    }
+
+    // ═════ D. 恢复混合模式 ═════
+    ctx.globalCompositeOperation = 'source-over';
+    p.pop();
+
+  };
+
+  p.windowResized = () => {
+    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    resetIntroVisuals(p.windowWidth, p.windowHeight);
+    if (geoReady && fontsReady) buildParticles();
+  };
+});
+</script>
+</body>
+</html>

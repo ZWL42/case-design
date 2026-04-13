@@ -1,0 +1,6 @@
+.DS_Store
+~$*.docx
+
+# Exclude files larger than GitHub hard limit
+参考文件/202302160036 许杰东 毕业设计图册.pdf
+参考文件/

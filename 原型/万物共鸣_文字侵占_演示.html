@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>万物共鸣 · 文字侵占 · 阶段演示</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #05050a; }
+
+#ui {
+  position: fixed; inset: 0; z-index: 10;
+  pointer-events: none;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 左上 — 纪元 */
+#era-block {
+  position: absolute; top: 32px; left: 40px;
+}
+.era-phase {
+  font-size: 9px; letter-spacing: .35em; text-transform: uppercase;
+  color: rgba(255,255,255,.22); margin-bottom: 5px;
+}
+.era-name {
+  font-family: 'STSong', 'SimSun', serif;
+  font-size: 21px; font-weight: 300; letter-spacing: .32em;
+  color: rgba(255,255,255,.62);
+}
+.era-year {
+  font-size: 9px; letter-spacing: .18em;
+  color: rgba(255,255,255,.18); margin-top: 6px;
+}
+
+/* 右上 — 项目标题 */
+#title-block {
+  position: absolute; top: 32px; right: 40px; text-align: right;
+}
+.title-main {
+  font-family: 'STSong', 'SimSun', serif;
+  font-size: 13px; letter-spacing: .55em;
+  color: rgba(255,255,255,.18);
+}
+.title-sub {
+  font-size: 9px; letter-spacing: .22em;
+  color: rgba(255,255,255,.1); margin-top: 4px;
+}
+
+/* 右下 — 扩张计数 */
+#civ-stat {
+  position: absolute; bottom: 54px; right: 40px;
+  text-align: right; font-size: 10px; letter-spacing: .12em;
+  color: rgba(218, 100, 50, .5); line-height: 2; white-space: pre;
+}
+
+/* 底部中 — 操作提示 */
+#hint {
+  position: absolute; bottom: 30px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px; color: rgba(255,255,255,.17);
+  letter-spacing: .25em; white-space: nowrap;
+}
+
+/* 顶部进度条 */
+#bar {
+  position: absolute; top: 0; left: 0; height: 1px;
+  background: rgba(255,255,255,.18); transition: width .2s linear;
+}
+
+/* 新纪元出现时的闪光遮罩 */
+#flash {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0);
+  pointer-events: none;
+  transition: background .12s ease-out;
+}
+
+/* 遏制成功提示 */
+#sup-msg {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'STSong', 'SimSun', serif;
+  font-size: 13px; letter-spacing: .4em;
+  color: rgba(255,255,255,0);
+  pointer-events: none;
+  transition: color .1s;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <div id="bar"></div>
+  <div id="era-block">
+    <div class="era-phase" id="era-phase">原型演示</div>
+    <div class="era-name"  id="era-name">共　生　期</div>
+    <div class="era-year"  id="era-year"></div>
+  </div>
+  <div id="title-block">
+    <div class="title-main">万物共鸣</div>
+    <div class="title-sub">文字侵占 · 阶段演示</div>
+  </div>
+  <div id="civ-stat"></div>
+  <div id="hint">点击文字聚落以遏制其扩张 · 按 R 重置</div>
+  <div id="flash"></div>
+  <div id="sup-msg">已遏制</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// 配置数据
+// ══════════════════════════════════════════════════
+
+const ERAS = [
+  {
+    phase : '第一纪',
+    name  : '远古文明',
+    year  : '约公元前 5000 年',
+    chars : ['甲','骨','王','天','Σ'],
+    col   : [198, 174, 85],   // 暖金
+    startAt      : 10000,
+    spawnInterval: 4500,
+    maxSpread    : 88,
+    spreadRate   : 0.30,
+    particleN    : 145
+  },
+  {
+    phase : '第二纪',
+    name  : '农耕城邦',
+    year  : '约公元 500 年',
+    chars : ['城','田','路','港','商'],
+    col   : [215, 115, 40],   // 琥珀橙
+    startAt      : 30000,
+    spawnInterval: 3000,
+    maxSpread    : 142,
+    spreadRate   : 0.44,
+    particleN    : 162
+  },
+  {
+    phase : '第三纪',
+    name  : '工业时代',
+    year  : '约公元 1850 年',
+    chars : ['工','厂','污','毒','灰'],
+    col   : [202, 50, 30],    // 工业红
+    startAt      : 54000,
+    spawnInterval: 2000,
+    maxSpread    : 198,
+    spreadRate   : 0.64,
+    particleN    : 182
+  }
+];
+
+const ANIMALS = [
+  { name: '雪豹',     col: [185, 215, 255], x: .21, y: .31 },
+  { name: '长江江豚', col: [152, 188, 255], x: .50, y: .70 },
+  { name: '华南虎',   col: [255, 190, 122], x: .79, y: .44 },
+];
+
+const ANIMAL_N   = 300;  // 每物种粒子数
+const SAMPLE_ST  = 6;    // 采样步长
+const TOTAL_DUR  = 90000; // 演示总时长 ms
+
+// ══════════════════════════════════════════════════
+// 全局状态
+// ══════════════════════════════════════════════════
+let pg;
+let animalGroups = [];
+let civGroups    = [];
+let ripples      = [];
+let elapsed      = 0;
+const spawnedCount = [0, 0, 0];
+
+// ══════════════════════════════════════════════════
+// p5 草图
+// ══════════════════════════════════════════════════
+new p5(p => {
+
+  // ── 采样文字像素 → 坐标点阵 ──────────────────────
+  function sample(txt, cx, cy, fs) {
+    pg.clear(); pg.background(0);
+    pg.fill(255); pg.noStroke();
+    pg.textFont('STSong, SimSun, Georgia, "Times New Roman", serif');
+    pg.textSize(fs);
+    pg.textAlign(p.CENTER, p.CENTER);
+    pg.text(txt, cx, cy);
+    pg.loadPixels();
+
+    const pts = [], m = fs * 1.6;
+    for (let x = cx - m; x < cx + m; x += SAMPLE_ST) {
+      for (let y = cy - m; y < cy + m; y += SAMPLE_ST) {
+        const xi = Math.floor(x), yi = Math.floor(y);
+        if (xi < 0 || xi >= pg.width || yi < 0 || yi >= pg.height) continue;
+        if (pg.pixels[(xi + yi * pg.width) * 4] > 100)
+          pts.push(p.createVector(x + p.random(-1.5, 1.5), y + p.random(-1.5, 1.5)));
+      }
+    }
+    // 兜底：字体未加载时给个随机云
+    if (!pts.length) {
+      for (let i = 0; i < 110; i++)
+        pts.push(p.createVector(cx + p.random(-m * .3, m * .3), cy + p.random(-m * .3, m * .3)));
+    }
+    return p.shuffle(pts);
+  }
+
+  // ── 构建动物粒子群 ───────────────────────────────
+  function buildAnimals() {
+    animalGroups = [];
+    const fs = Math.min(p.width, p.height) * 0.094;
+    ANIMALS.forEach(sp => {
+      const cx = sp.x * p.width, cy = sp.y * p.height;
+      const pts = sample(sp.name, cx, cy, fs);
+      const [r, g, b] = sp.col;
+      const particles = [];
+      for (let i = 0; i < ANIMAL_N; i++) {
+        const t = pts[i % pts.length];
+        particles.push({
+          x: cx + p.random(-75, 75), y: cy + p.random(-75, 75),
+          vx: 0, vy: 0,
+          tx: t.x, ty: t.y,
+          r, g, b,
+          sz: p.random(1.2, 2.7),
+          no: p.random(10000)
+        });
+      }
+      animalGroups.push({ sp, particles });
+    });
+  }
+
+  // ── 生成文明文字群落 ─────────────────────────────
+  function spawnCiv(eraIdx, charStr) {
+    const era = ERAS[eraIdx];
+    const fs  = Math.min(p.width, p.height) * (0.083 + eraIdx * 0.018);
+
+    // 选位：避免扎堆
+    let cx, cy, tries = 0;
+    do {
+      cx = p.random(0.09, 0.91) * p.width;
+      cy = p.random(0.11, 0.89) * p.height;
+      tries++;
+    } while (tries < 28 && civGroups.some(g => g.active && p.dist(cx, cy, g.x, g.y) < 125));
+
+    const pts = sample(charStr, cx, cy, fs);
+    const [r, g, b] = era.col;
+    const particles = [];
+
+    for (let i = 0; i < era.particleN; i++) {
+      const t = pts[i % pts.length];
+      // 从外围爆散入场
+      const angle = p.random(p.TWO_PI), burst = p.random(28, 95);
+      particles.push({
+        x: cx + Math.cos(angle) * burst,
+        y: cy + Math.sin(angle) * burst,
+        vx: p.random(-1.2, 1.2), vy: p.random(-1.2, 1.2),
+        tx: t.x, ty: t.y,
+        r, g, b,
+        sz: p.random(0.9, 2.2),
+        no: p.random(10000)
+      });
+    }
+
+    civGroups.push({
+      char: charStr, era: eraIdx,
+      x: cx, y: cy,
+      spread: 5, maxSpread: era.maxSpread,
+      spreadRate: era.spreadRate,
+      col: era.col,
+      active: true, suppressed: false, suppressT: 0,
+      particles, age: 0
+    });
+
+    // 屏幕微闪
+    const flash = document.getElementById('flash');
+    flash.style.background = `rgba(${era.col.join(',')}, 0.05)`;
+    setTimeout(() => { flash.style.background = 'rgba(255,255,255,0)'; }, 350);
+  }
+
+  // ── 调度文明生成 ─────────────────────────────────
+  function updateSpawns() {
+    ERAS.forEach((era, ei) => {
+      if (elapsed < era.startAt || spawnedCount[ei] >= era.chars.length) return;
+      const sincStart = elapsed - era.startAt;
+      const shouldHave = Math.min(
+        Math.floor(sincStart / era.spawnInterval) + 1,
+        era.chars.length
+      );
+      while (spawnedCount[ei] < shouldHave) {
+        spawnCiv(ei, era.chars[spawnedCount[ei]]);
+        spawnedCount[ei]++;
+      }
+    });
+  }
+
+  // ── setup ────────────────────────────────────────
+  p.setup = () => {
+    const c = p.createCanvas(p.windowWidth, p.windowHeight);
+    c.elt.style.cssText = 'position:fixed;top:0;left:0;z-index:0;';
+    document.body.insertBefore(c.elt, document.getElementById('ui'));
+    p.colorMode(p.RGB, 255);
+    p.noStroke();
+    pg = p.createGraphics(p.width, p.height);
+    buildAnimals();
+  };
+
+  p.windowResized = () => {
+    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    pg = p.createGraphics(p.width, p.height);
+    civGroups = []; animalGroups = []; ripples = [];
+    elapsed = 0; spawnedCount.fill(0);
+    buildAnimals();
+  };
+
+  // ── 键盘：R 重置 ──────────────────────────────────
+  p.keyPressed = () => {
+    if (p.key === 'r' || p.key === 'R') {
+      civGroups = []; ripples = [];
+      elapsed = 0; spawnedCount.fill(0);
+      buildAnimals();
+    }
+  };
+
+  // ── 点击：遏制最近的文明群落 ─────────────────────
+  p.mousePressed = () => {
+    let hit = null, bestD = Infinity;
+    civGroups.forEach(g => {
+      if (!g.active || g.suppressed) return;
+      const d = p.dist(p.mouseX, p.mouseY, g.x, g.y);
+      if (d < g.spread + 28 && d < bestD) { hit = g; bestD = d; }
+    });
+    if (hit) {
+      hit.suppressed = true;
+      hit.suppressT  = 0;
+      // 涟漪
+      ripples.push({ x: hit.x, y: hit.y, r: hit.spread, col: hit.col, t: 0 });
+      // 提示闪现
+      const msg = document.getElementById('sup-msg');
+      msg.style.color = 'rgba(255,255,255,0.55)';
+      setTimeout(() => { msg.style.color = 'rgba(255,255,255,0)'; }, 700);
+    }
+  };
+
+  // ══ 主绘制循环 ═══════════════════════════════════
+  p.draw = () => {
+    p.background(5, 5, 10, 27);
+    elapsed += p.deltaTime;
+
+    updateSpawns();
+    updateCursor();
+
+    // ── 遏制涟漪 ──────────────────────────────────
+    ripples = ripples.filter(rp => rp.t < 1400);
+    p.noFill();
+    ripples.forEach(rp => {
+      rp.t += p.deltaTime;
+      const prog = rp.t / 1400;
+      const radius = rp.r * (1 + prog * 0.9);
+      const alpha  = (1 - prog) * 60;
+      p.stroke(rp.col[0], rp.col[1], rp.col[2], alpha);
+      p.strokeWeight(1.2);
+      p.ellipse(rp.x, rp.y, radius * 2);
+    });
+    p.noStroke();
+
+    // ── 文明群落 ───────────────────────────────────
+    civGroups.forEach(g => {
+      if (!g.active) return;
+      g.age += p.deltaTime;
+
+      let alpha;
+      if (g.suppressed) {
+        g.suppressT += p.deltaTime;
+        const prog = Math.min(1, g.suppressT / 2100);
+        g.spread    = Math.max(0, g.spread - 1.9);
+        alpha       = 1 - prog;
+        if (g.spread <= 0) { g.active = false; return; }
+      } else {
+        g.spread = Math.min(g.maxSpread, g.spread + g.spreadRate);
+        alpha    = Math.min(1, g.age / 1100);
+      }
+
+      const [r, gv, b] = g.col;
+
+      // 领地光晕（三层渐隐圆）
+      if (!g.suppressed && g.spread > 12) {
+        p.fill(r, gv, b, alpha * 7);  p.ellipse(g.x, g.y, g.spread * 2.0);
+        p.fill(r, gv, b, alpha * 12); p.ellipse(g.x, g.y, g.spread * 1.25);
+        p.fill(r, gv, b, alpha * 20); p.ellipse(g.x, g.y, g.spread * 0.5);
+      }
+
+      // 粒子
+      g.particles.forEach(pt => {
+        const dx = pt.tx - pt.x, dy = pt.ty - pt.y;
+        const pull = g.suppressed ? 0.003 : 0.012;
+        pt.vx += dx * pull; pt.vy += dy * pull;
+
+        // 被遏制时向外散射
+        if (g.suppressed) {
+          const sx = pt.x - g.x, sy = pt.y - g.y;
+          const sd = Math.sqrt(sx * sx + sy * sy) + 1;
+          const sf = Math.min(1, g.suppressT / 2100) * 1.3;
+          pt.vx += sx / sd * sf; pt.vy += sy / sd * sf;
+        }
+
+        const n  = p.noise(pt.x * .003, pt.y * .003, p.frameCount * .004 + pt.no);
+        const na = n * p.TWO_PI * 2;
+        pt.vx += Math.cos(na) * .09; pt.vy += Math.sin(na) * .09;
+        pt.vx *= .875; pt.vy *= .875;
+        pt.x  += pt.vx;  pt.y  += pt.vy;
+
+        const a = alpha * 195;
+        p.fill(r, gv, b, a * .20); p.ellipse(pt.x, pt.y, pt.sz * 4.5);
+        p.fill(r, gv, b, a);       p.ellipse(pt.x, pt.y, pt.sz);
+      });
+    });
+
+    // ── 动物群落 ───────────────────────────────────
+    animalGroups.forEach(({ sp, particles }) => {
+      const [r, gv, b] = sp.col;
+
+      particles.forEach(pt => {
+        const dx = pt.tx - pt.x, dy = pt.ty - pt.y;
+        const d  = Math.sqrt(dx * dx + dy * dy);
+
+        // 归巢引力
+        pt.vx += dx * p.map(d, 0, 200, .012, .084);
+        pt.vy += dy * p.map(d, 0, 200, .012, .084);
+
+        // 文明排斥力
+        civGroups.forEach(g => {
+          if (!g.active) return;
+          const cdx = pt.x - g.x, cdy = pt.y - g.y;
+          const cd  = Math.sqrt(cdx * cdx + cdy * cdy);
+          const repR = g.spread * 1.65 * (g.suppressed ? 0.22 : 1.0);
+          if (cd < repR) {
+            const f = p.map(cd, 0, repR, 8.5, 0);
+            pt.vx += cdx / (cd + 1) * f;
+            pt.vy += cdy / (cd + 1) * f;
+          }
+        });
+
+        // 柏林噪声扰动
+        const n = p.noise(pt.x * .003, pt.y * .003, p.frameCount * .005 + pt.no);
+        pt.vx += Math.cos(n * p.TWO_PI * 2) * .12;
+        pt.vy += Math.sin(n * p.TWO_PI * 2) * .12;
+        pt.vx *= .872; pt.vy *= .872;
+
+        const spd = Math.sqrt(pt.vx * pt.vx + pt.vy * pt.vy);
+        if (spd > 8.5) { pt.vx *= 8.5 / spd; pt.vy *= 8.5 / spd; }
+        pt.x += pt.vx; pt.y += pt.vy;
+
+        // 应激变色：速度越快越暖、越暗
+        const stress = Math.min(1, spd / 5.5);
+        const rr = Math.min(255, r  + stress * 24);
+        const gg = Math.max(0,   gv - stress * 20);
+        const bb = Math.max(0,   b  - stress * 28);
+        const al = p.constrain(p.map(spd, 0, 8, 215, 55), 18, 255);
+
+        p.fill(rr, gg, bb, al * .18); p.ellipse(pt.x, pt.y, pt.sz * 5.2);
+        p.fill(rr, gg, bb, al);       p.ellipse(pt.x, pt.y, pt.sz);
+      });
+    });
+
+    updateUI();
+  };
+
+  // ── 鼠标悬停提示 ──────────────────────────────────
+  function updateCursor() {
+    const hovering = civGroups.some(
+      g => g.active && !g.suppressed &&
+           p.dist(p.mouseX, p.mouseY, g.x, g.y) < g.spread + 28
+    );
+    document.body.style.cursor = hovering ? 'crosshair' : 'default';
+  }
+
+  // ── UI 更新 ────────────────────────────────────────
+  function updateUI() {
+    let phase = '原型演示', name = '共　生　期', year = '';
+    for (let i = ERAS.length - 1; i >= 0; i--) {
+      if (elapsed >= ERAS[i].startAt) {
+        phase = ERAS[i].phase;
+        name  = ERAS[i].name;
+        year  = ERAS[i].year;
+        break;
+      }
+    }
+    document.getElementById('era-phase').textContent = phase;
+    document.getElementById('era-name').textContent  = name;
+    document.getElementById('era-year').textContent  = year;
+
+    document.getElementById('bar').style.width =
+      Math.min(100, elapsed / TOTAL_DUR * 100) + '%';
+
+    const active     = civGroups.filter(g => g.active && !g.suppressed).length;
+    const suppressed = civGroups.filter(g => g.suppressed || !g.active).length;
+    let stat = '';
+    if (active     > 0) stat += `文字扩张区域  ${active}`;
+    if (suppressed > 0) stat += (stat ? '\n' : '') + `已遏制  ${suppressed}`;
+    document.getElementById('civ-stat').textContent = stat;
+  }
+
+}); // end p5
+</script>
+</body>
+</html>

@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>文字演化：人 → 屋子 → 城市</title>
+  <style>
+    @font-face {
+      font-family: "YangRenDongZhu";
+      src:
+        local("YangRenDongZhuShiTi Light 2"),
+        local("YangRenDongZhuShiTi-Light-2"),
+        local("YangRenDongZhu"),
+        url("../sours/YangRenDongZhuShiTi-Light-2.ttf") format("truetype");
+      font-weight: 100 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #05070b;
+      font-family: "YangRenDongZhu", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    #world {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+    #hud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 10px 12px;
+      line-height: 1.6;
+      font-size: 12px;
+      pointer-events: none;
+      min-width: 220px;
+      backdrop-filter: blur(4px);
+    }
+    #hud .title {
+      font-size: 13px;
+      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.95);
+    }
+    #tip {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(255, 255, 255, 0.6);
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      padding: 10px 14px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+      background: rgba(0, 0, 0, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <div id="hud">
+    <div class="title">文字演化系统（阶段一）</div>
+    <div id="font-probe" style="font-size:11px;line-height:1.4;margin-bottom:6px;opacity:.85;">
+      <span style="font-family:'YangRenDongZhu','PingFang SC',sans-serif;">探针A：人众村镇城山水林</span><br>
+      <span style="font-family:'PingFang SC','Microsoft YaHei',sans-serif;opacity:.6;">探针B：人众村镇城山水林</span>
+    </div>
+    <div id="status"></div>
+  </div>
+  <div id="tip">点击画布放置“人”（山水林环境已预置）</div>
+
+  <script>
+    const canvas = document.getElementById("world");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const tipEl = document.getElementById("tip");
+    const CHAR_FONT = "\"YangRenDongZhu\", \"STHeiti\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif";
+    let fontReady = false;
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("300 16px \"YangRenDongZhu\"").then(() => {
+        fontReady = true;
+        refreshMetrics();
+      }).catch(() => {
+        fontReady = false;
+        refreshMetrics();
+      });
+    }
+
+    const CELL = 9;
+    const STEP_MS = 95;
+
+    const TYPE = {
+      EMPTY: 0,
+      PERSON: 1,
+      HOUSE: 2,
+      CITY: 3,
+      ROAD: 4
+    };
+
+    const TERRAIN = {
+      PLAIN: 0,
+      WATER: 1,
+      FOREST: 2,
+      MOUNTAIN: 3
+    };
+
+    const PERSON_OR_BUILDING = new Set([TYPE.PERSON, TYPE.HOUSE, TYPE.CITY]);
+    const SETTLEMENT = new Set([TYPE.HOUSE, TYPE.CITY, TYPE.ROAD]);
+
+    let cols = 0;
+    let rows = 0;
+    let cells = new Uint8Array(0);
+    let ages = new Uint16Array(0);
+    let terrain = new Uint8Array(0);
+    let hasSeed = false;
+    let paused = false;
+    let terrainSeed = 1337;
+
+    let hover = { x: -1, y: -1 };
+    let stepAccumulator = 0;
+    let prevTime = performance.now();
+    let walkerSpawnClock = 0;
+    const walkers = [];
+
+    let metrics = {
+      people: 0,
+      houses: 0,
+      cities: 0,
+      roads: 0,
+      explorers: 0,
+      phase: "萌芽"
+    };
+
+    function controlHint() {
+      return `点击放置“人” · P随机投放 · R重置 · 空格${paused ? "继续" : "暂停"} · 字体${fontReady ? "已加载" : "回退中"}`;
+    }
+
+    function hash2(x, y, seed = 0) {
+      let h = Math.imul(x + 0x9e3779b1, 374761393) ^ Math.imul(y + seed + 0x85ebca6b, 668265263);
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return (h ^ (h >>> 16)) >>> 0;
+    }
+
+    function rand2(x, y, seed = 0) {
+      return hash2(x, y, seed) / 4294967296;
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function smoothstep(t) {
+      return t * t * (3 - 2 * t);
+    }
+
+    function valueNoise(x, y, scale, seed) {
+      const fx = x / scale;
+      const fy = y / scale;
+      const xi = Math.floor(fx);
+      const yi = Math.floor(fy);
+      const tx = smoothstep(fx - xi);
+      const ty = smoothstep(fy - yi);
+
+      const n00 = rand2(xi, yi, seed);
+      const n10 = rand2(xi + 1, yi, seed);
+      const n01 = rand2(xi, yi + 1, seed);
+      const n11 = rand2(xi + 1, yi + 1, seed);
+
+      const nx0 = lerp(n00, n10, tx);
+      const nx1 = lerp(n01, n11, tx);
+      return lerp(nx0, nx1, ty);
+    }
+
+    function idx(x, y) {
+      return y * cols + x;
+    }
+
+    function inBounds(x, y) {
+      return x >= 0 && x < cols && y >= 0 && y < rows;
+    }
+
+    function terrainAt(x, y) {
+      return terrain[idx(x, y)];
+    }
+
+    function nearTerrain(x, y, terrainType, radius) {
+      for (let oy = -radius; oy <= radius; oy += 1) {
+        for (let ox = -radius; ox <= radius; ox += 1) {
+          const nx = x + ox;
+          const ny = y + oy;
+          if (!inBounds(nx, ny)) continue;
+          if (terrainAt(nx, ny) === terrainType) return true;
+        }
+      }
+      return false;
+    }
+
+    function canOccupyPerson(x, y) {
+      const t = terrainAt(x, y);
+      return t !== TERRAIN.WATER && t !== TERRAIN.MOUNTAIN;
+    }
+
+    function canBuild(x, y) {
+      const t = terrainAt(x, y);
+      return t === TERRAIN.PLAIN || t === TERRAIN.FOREST;
+    }
+
+    function canRoad(x, y) {
+      const t = terrainAt(x, y);
+      return t !== TERRAIN.WATER && t !== TERRAIN.MOUNTAIN;
+    }
+
+    function generateTerrain() {
+      terrain.fill(TERRAIN.PLAIN);
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const nx = x / Math.max(1, cols - 1);
+          const ny = y / Math.max(1, rows - 1);
+          const curve = Math.sin(nx * 3.8 + valueNoise(x, y, 52, terrainSeed + 3) * 2.2) * 0.09;
+          const riverCenter = 0.52 + curve + Math.sin(nx * 9.2 + 0.8) * 0.02;
+          const riverWidth = 0.015 + valueNoise(x, y, 70, terrainSeed + 5) * 0.01;
+          const river = Math.abs(ny - riverCenter) < riverWidth;
+          const lake = valueNoise(x, y, 95, terrainSeed + 7) > 0.955 && Math.abs(ny - riverCenter) < 0.16;
+          if (river || lake) {
+            terrain[idx(x, y)] = TERRAIN.WATER;
+          }
+        }
+      }
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = idx(x, y);
+          if (terrain[i] === TERRAIN.WATER) continue;
+          const nx = x / Math.max(1, cols - 1);
+          const ridge = valueNoise(x, y, 36, terrainSeed + 17) * 0.7 + valueNoise(x, y, 82, terrainSeed + 23) * 0.3;
+          const westBias = (1 - nx) * 0.42;
+          if (ridge + westBias > 0.9) {
+            terrain[i] = TERRAIN.MOUNTAIN;
+          }
+        }
+      }
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = idx(x, y);
+          if (terrain[i] !== TERRAIN.PLAIN) continue;
+          const forestField = valueNoise(x, y, 44, terrainSeed + 29) * 0.65 + valueNoise(x, y, 96, terrainSeed + 31) * 0.35;
+          const nearNatural = nearTerrain(x, y, TERRAIN.WATER, 2) || nearTerrain(x, y, TERRAIN.MOUNTAIN, 1);
+          if (forestField > (nearNatural ? 0.8 : 0.88)) {
+            terrain[i] = TERRAIN.FOREST;
+          }
+        }
+      }
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = idx(x, y);
+          if (terrain[i] === TERRAIN.FOREST && rand2(x, y, terrainSeed + 37) < 0.32) {
+            terrain[i] = TERRAIN.PLAIN;
+          }
+          if (terrain[i] === TERRAIN.MOUNTAIN && rand2(x, y, terrainSeed + 41) < 0.15) {
+            terrain[i] = TERRAIN.PLAIN;
+          }
+        }
+      }
+    }
+
+    function sanitizeByTerrain() {
+      for (let i = 0; i < cells.length; i += 1) {
+        const t = cells[i];
+        if (t === TYPE.EMPTY) continue;
+        if ((t === TYPE.HOUSE || t === TYPE.CITY) && !canBuild(i % cols, (i / cols) | 0)) {
+          cells[i] = TYPE.EMPTY;
+          ages[i] = 0;
+        } else if (t === TYPE.ROAD && !canRoad(i % cols, (i / cols) | 0)) {
+          cells[i] = TYPE.EMPTY;
+          ages[i] = 0;
+        } else if (t === TYPE.PERSON && !canOccupyPerson(i % cols, (i / cols) | 0)) {
+          cells[i] = TYPE.EMPTY;
+          ages[i] = 0;
+        }
+      }
+    }
+
+    function resize() {
+      const oldCols = cols;
+      const oldRows = rows;
+      const oldCells = cells;
+      const oldAges = ages;
+
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const cssW = window.innerWidth;
+      const cssH = window.innerHeight;
+
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      canvas.style.width = cssW + "px";
+      canvas.style.height = cssH + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      cols = Math.max(6, Math.floor(cssW / CELL));
+      rows = Math.max(6, Math.floor(cssH / CELL));
+      cells = new Uint8Array(cols * rows);
+      ages = new Uint16Array(cols * rows);
+      terrain = new Uint8Array(cols * rows);
+      generateTerrain();
+
+      if (oldCols > 0 && oldRows > 0) {
+        const copyW = Math.min(oldCols, cols);
+        const copyH = Math.min(oldRows, rows);
+        for (let y = 0; y < copyH; y += 1) {
+          for (let x = 0; x < copyW; x += 1) {
+            const ni = idx(x, y);
+            const oi = y * oldCols + x;
+            cells[ni] = oldCells[oi];
+            ages[ni] = oldAges[oi];
+          }
+        }
+      }
+
+      sanitizeByTerrain();
+      refreshMetrics();
+    }
+
+    function resetWorld() {
+      cells.fill(TYPE.EMPTY);
+      ages.fill(0);
+      walkers.length = 0;
+      walkerSpawnClock = 0;
+      hasSeed = false;
+      refreshMetrics();
+      tipEl.style.opacity = "1";
+    }
+
+    function randInt(max) {
+      return Math.floor(Math.random() * max);
+    }
+
+    function forEachNeighbor(x, y, radius, callback) {
+      for (let oy = -radius; oy <= radius; oy += 1) {
+        for (let ox = -radius; ox <= radius; ox += 1) {
+          if (ox === 0 && oy === 0) continue;
+          const nx = x + ox;
+          const ny = y + oy;
+          if (!inBounds(nx, ny)) continue;
+          callback(nx, ny);
+        }
+      }
+    }
+
+    function countNearby(x, y, set, radius, arr) {
+      let n = 0;
+      forEachNeighbor(x, y, radius, (nx, ny) => {
+        if (set.has(arr[idx(nx, ny)])) n += 1;
+      });
+      return n;
+    }
+
+    function randomEmptyAround(x, y, radius, arr, validator) {
+      const list = [];
+      forEachNeighbor(x, y, radius, (nx, ny) => {
+        const t = arr[idx(nx, ny)];
+        if (t !== TYPE.EMPTY) return;
+        if (validator && !validator(nx, ny)) return;
+        list.push({ x: nx, y: ny });
+      });
+      if (!list.length) return null;
+      return list[randInt(list.length)];
+    }
+
+    function hasNearbyType(x, y, arr, targetSet, radius) {
+      return countNearby(x, y, targetSet, radius, arr) > 0;
+    }
+
+    function collectStructures(arr) {
+      const out = [];
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const t = arr[idx(x, y)];
+          if (t === TYPE.HOUSE || t === TYPE.CITY) out.push({ x, y });
+        }
+      }
+      return out;
+    }
+
+    function nearestStructure(from, structures) {
+      let best = null;
+      let bestDist = Infinity;
+      for (let i = 0; i < structures.length; i += 1) {
+        const s = structures[i];
+        if (s.x === from.x && s.y === from.y) continue;
+        const dx = s.x - from.x;
+        const dy = s.y - from.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestDist) {
+          bestDist = d2;
+          best = s;
+        }
+      }
+      return best;
+    }
+
+    function carveRoad(a, b, arr, arrAge) {
+      let x = a.x;
+      let y = a.y;
+      let guard = 0;
+      const maxSteps = cols + rows + 120;
+
+      while ((x !== b.x || y !== b.y) && guard < maxSteps) {
+        guard += 1;
+        const dx = b.x - x;
+        const dy = b.y - y;
+
+        let mx = 0;
+        let my = 0;
+
+        if (Math.random() < 0.52) {
+          if (dx !== 0) mx = Math.sign(dx);
+          else if (dy !== 0) my = Math.sign(dy);
+        } else {
+          if (dy !== 0) my = Math.sign(dy);
+          else if (dx !== 0) mx = Math.sign(dx);
+        }
+
+        if (mx === 0 && my === 0) break;
+        x += mx;
+        y += my;
+        if (!inBounds(x, y)) break;
+        if (!canRoad(x, y)) continue;
+
+        const i = idx(x, y);
+        const t = arr[i];
+        if (t !== TYPE.HOUSE && t !== TYPE.CITY) {
+          if (t === TYPE.EMPTY || t === TYPE.PERSON) {
+            arr[i] = TYPE.ROAD;
+            arrAge[i] = 0;
+          }
+        }
+
+        if (Math.random() < 0.08) {
+          const side = randomEmptyAround(x, y, 1, arr, canRoad);
+          if (side) {
+            const si = idx(side.x, side.y);
+            arr[si] = TYPE.ROAD;
+            arrAge[si] = 0;
+          }
+        }
+      }
+    }
+
+    function findExplorationTarget(homeX, homeY) {
+      const tries = 40;
+      for (let i = 0; i < tries; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 7 + randInt(16);
+        const tx = Math.round(homeX + Math.cos(angle) * dist);
+        const ty = Math.round(homeY + Math.sin(angle) * dist);
+        if (!inBounds(tx, ty)) continue;
+        if (cells[idx(tx, ty)] !== TYPE.EMPTY) continue;
+        if (!canRoad(tx, ty)) continue;
+        const tt = terrainAt(tx, ty);
+        const natural = tt === TERRAIN.FOREST || nearTerrain(tx, ty, TERRAIN.WATER, 2) || nearTerrain(tx, ty, TERRAIN.MOUNTAIN, 1);
+        if (!natural) continue;
+        return { x: tx, y: ty };
+      }
+      return null;
+    }
+
+    function gridPath(fromX, fromY, toX, toY) {
+      const path = [{ x: fromX, y: fromY }];
+      let x = fromX;
+      let y = fromY;
+      const maxSteps = cols + rows + 80;
+
+      for (let guard = 0; guard < maxSteps; guard += 1) {
+        if (x === toX && y === toY) return path;
+        const dx = toX - x;
+        const dy = toY - y;
+
+        const preferX = Math.abs(dx) >= Math.abs(dy) ? 1 : 0;
+        const options = preferX
+          ? [{ x: x + Math.sign(dx), y }, { x, y: y + Math.sign(dy) }]
+          : [{ x, y: y + Math.sign(dy) }, { x: x + Math.sign(dx), y }];
+
+        let moved = false;
+        for (let k = 0; k < options.length; k += 1) {
+          const nx = options[k].x;
+          const ny = options[k].y;
+          if (nx === x && ny === y) continue;
+          if (!inBounds(nx, ny)) continue;
+          if (!canRoad(nx, ny)) continue;
+          x = nx;
+          y = ny;
+          path.push({ x, y });
+          moved = true;
+          break;
+        }
+        if (!moved) return null;
+      }
+      return null;
+    }
+
+    function spawnWalker() {
+      if (!hasSeed || paused) return;
+      const structures = collectStructures(cells);
+      if (!structures.length) return;
+      const maxWalkers = Math.max(1, Math.min(10, Math.floor((metrics.cities + metrics.houses) / 7)));
+      if (walkers.length >= maxWalkers) return;
+
+      const home = structures[randInt(structures.length)];
+      const target = findExplorationTarget(home.x, home.y);
+      if (!target) return;
+      const path = gridPath(home.x, home.y, target.x, target.y);
+      if (!path || path.length < 3) return;
+
+      walkers.push({
+        path,
+        index: 0,
+        direction: 1,
+        stepClock: 0,
+        stepInterval: 150 + randInt(120),
+        pause: 0,
+        glyph: "行"
+      });
+    }
+
+    function updateWalkers(dt) {
+      if (!hasSeed || paused) return;
+
+      walkerSpawnClock += dt;
+      if (walkerSpawnClock > 1500 + Math.random() * 1200) {
+        spawnWalker();
+        walkerSpawnClock = 0;
+      }
+
+      for (let i = walkers.length - 1; i >= 0; i -= 1) {
+        const w = walkers[i];
+        if (w.pause > 0) {
+          w.pause -= dt;
+          continue;
+        }
+
+        w.stepClock += dt;
+        if (w.stepClock < w.stepInterval) continue;
+        w.stepClock = 0;
+
+        w.index += w.direction;
+        if (w.direction === 1 && w.index >= w.path.length - 1) {
+          w.index = w.path.length - 1;
+          w.direction = -1;
+          w.glyph = "归";
+          w.pause = 420 + randInt(520);
+        } else if (w.direction === -1 && w.index <= 0) {
+          walkers.splice(i, 1);
+        }
+      }
+    }
+
+    function walkerPosition(w) {
+      return w.path[w.index] || w.path[0];
+    }
+
+    function phaseBy(snapshot) {
+      if (snapshot.people <= 8 && snapshot.houses === 0 && snapshot.cities === 0) return 0;
+      if (snapshot.houses < 8) return 1;
+      if (snapshot.cities < 15) return 2;
+      return 3;
+    }
+
+    function phaseLabel(p) {
+      if (p === 0) return "萌芽：人开始聚集";
+      if (p === 1) return "发展：开始建造屋子";
+      if (p === 2) return "成形：城镇和道路出现";
+      return "蔓延：城市网络扩张";
+    }
+
+    function refreshMetrics() {
+      if (document.fonts && document.fonts.check) {
+        fontReady = document.fonts.check("300 16px \"YangRenDongZhu\"");
+      }
+      let people = 0;
+      let houses = 0;
+      let cities = 0;
+      let roads = 0;
+
+      for (let i = 0; i < cells.length; i += 1) {
+        const t = cells[i];
+        if (t === TYPE.PERSON) people += 1;
+        else if (t === TYPE.HOUSE) houses += 1;
+        else if (t === TYPE.CITY) cities += 1;
+        else if (t === TYPE.ROAD) roads += 1;
+      }
+
+      hasSeed = people + houses + cities > 0;
+      const phase = phaseBy({ people, houses, cities });
+
+      metrics = {
+        people,
+        houses,
+        cities,
+        roads,
+        explorers: walkers.length,
+        phase: phaseLabel(phase)
+      };
+
+      statusEl.innerHTML = [
+        `阶段：${metrics.phase}`,
+        `人：${people}　屋：${houses}`,
+        `城：${cities}　路：${roads}`,
+        `活动人群：${metrics.explorers}（离城探索后返回）`,
+        controlHint()
+      ].join("<br>");
+    }
+
+    function findPlaceableFrom(x, y, maxRadius = 4) {
+      if (inBounds(x, y)) {
+        const t = cells[idx(x, y)];
+        if ((t === TYPE.EMPTY || t === TYPE.ROAD) && canOccupyPerson(x, y)) {
+          return { x, y };
+        }
+      }
+
+      for (let r = 1; r <= maxRadius; r += 1) {
+        const cands = [];
+        for (let oy = -r; oy <= r; oy += 1) {
+          for (let ox = -r; ox <= r; ox += 1) {
+            if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+            const nx = x + ox;
+            const ny = y + oy;
+            if (!inBounds(nx, ny)) continue;
+            const t = cells[idx(nx, ny)];
+            if ((t === TYPE.EMPTY || t === TYPE.ROAD) && canOccupyPerson(nx, ny)) {
+              cands.push({ x: nx, y: ny });
+            }
+          }
+        }
+        if (cands.length) return cands[randInt(cands.length)];
+      }
+      return null;
+    }
+
+    function placePerson(x, y) {
+      const spot = findPlaceableFrom(x, y, 5);
+      if (!spot) return false;
+      const i = idx(spot.x, spot.y);
+      cells[i] = TYPE.PERSON;
+      ages[i] = 0;
+      hasSeed = true;
+      tipEl.style.opacity = "0";
+      refreshMetrics();
+      return true;
+    }
+
+    function randomPlaceable(preferSettlement) {
+      const structures = preferSettlement ? collectStructures(cells) : [];
+      for (let tries = 0; tries < 120; tries += 1) {
+        let x;
+        let y;
+
+        if (preferSettlement && structures.length) {
+          const s = structures[randInt(structures.length)];
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 1 + randInt(7);
+          x = s.x + Math.round(Math.cos(angle) * dist);
+          y = s.y + Math.round(Math.sin(angle) * dist);
+        } else {
+          x = randInt(cols);
+          y = randInt(rows);
+        }
+
+        if (!inBounds(x, y)) continue;
+        const t = cells[idx(x, y)];
+        if ((t !== TYPE.EMPTY && t !== TYPE.ROAD) || !canOccupyPerson(x, y)) continue;
+        return { x, y };
+      }
+      return null;
+    }
+
+    function scatterPeople(count) {
+      let placed = 0;
+      const structures = collectStructures(cells);
+      const preferSettlement = structures.length > 0;
+      const hubs = [];
+
+      if (!preferSettlement) {
+        const hubCount = Math.max(1, Math.min(5, Math.floor(count / 10)));
+        for (let i = 0; i < hubCount; i += 1) {
+          const h = randomPlaceable(false);
+          if (h) hubs.push(h);
+        }
+      }
+
+      for (let i = 0; i < count; i += 1) {
+        let p = null;
+        if (!preferSettlement && hubs.length) {
+          const h = hubs[randInt(hubs.length)];
+          p = findPlaceableFrom(
+            h.x + (randInt(7) - 3),
+            h.y + (randInt(7) - 3),
+            3
+          );
+        }
+        if (!p) p = randomPlaceable(preferSettlement);
+        if (!p) continue;
+        const pi = idx(p.x, p.y);
+        cells[pi] = TYPE.PERSON;
+        ages[pi] = 0;
+        placed += 1;
+      }
+      if (placed > 0) {
+        hasSeed = true;
+        tipEl.style.opacity = "0";
+        refreshMetrics();
+      }
+    }
+
+    function simulateStep() {
+      if (!hasSeed || paused) return;
+
+      const snapshot = {
+        people: metrics.people,
+        houses: metrics.houses,
+        cities: metrics.cities
+      };
+      const phase = phaseBy(snapshot);
+      const currentStructures = collectStructures(cells);
+      const hasStructure = currentStructures.length > 0;
+
+      const next = cells.slice();
+      const nextAges = ages.slice();
+      const newStructures = [];
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = idx(x, y);
+          const t = cells[i];
+
+          if (t === TYPE.EMPTY) continue;
+          nextAges[i] = Math.min(65535, ages[i] + 1);
+
+          if (t === TYPE.PERSON) {
+            const crowd = countNearby(x, y, PERSON_OR_BUILDING, 1, cells);
+            const linkedToSettlement = hasNearbyType(x, y, cells, SETTLEMENT, 2);
+            const settlementPull = countNearby(x, y, SETTLEMENT, 3, cells);
+            const spreadChance = hasStructure
+              ? Math.min(0.46, 0.03 + crowd * 0.07 + Math.min(6, settlementPull) * 0.028 + phase * 0.01)
+              : Math.min(0.52, 0.08 + crowd * 0.1 + phase * 0.02);
+            if (Math.random() < spreadChance) {
+              const spot = randomEmptyAround(x, y, 1, next, (sx, sy) => {
+                if (!canOccupyPerson(sx, sy)) return false;
+                const support = countNearby(sx, sy, PERSON_OR_BUILDING, 1, next);
+                const anchored = hasNearbyType(sx, sy, next, SETTLEMENT, 3);
+                return hasStructure ? ((support >= 2 && anchored) || support >= 5) : support >= 3;
+              });
+              if (spot) {
+                const si = idx(spot.x, spot.y);
+                next[si] = TYPE.PERSON;
+                nextAges[si] = 0;
+              }
+            }
+
+            const canBootstrapBuild = !hasStructure && ages[i] > 3 && crowd >= 3;
+            const canSettlementBuild = hasStructure && ages[i] > 4 && linkedToSettlement && crowd >= 2;
+            if (phase >= 1 && (canBootstrapBuild || canSettlementBuild) &&
+              Math.random() < (canBootstrapBuild ? 0.12 : (0.02 + crowd * 0.01))) {
+              const build = randomEmptyAround(x, y, 1, next, canBuild);
+              if (build) {
+                const bi = idx(build.x, build.y);
+                next[bi] = TYPE.HOUSE;
+                nextAges[bi] = 0;
+                newStructures.push(build);
+              }
+            }
+
+            const isolated = crowd <= 1 && settlementPull <= 1;
+            if (hasStructure && isolated && ages[i] > 7) {
+              let moved = false;
+              if (currentStructures.length) {
+                const home = nearestStructure({ x, y }, currentStructures);
+                if (home) {
+                  const pullSpot = randomEmptyAround(home.x, home.y, 1, next, (sx, sy) => {
+                    return canOccupyPerson(sx, sy) && hasNearbyType(sx, sy, next, SETTLEMENT, 2);
+                  });
+                  if (pullSpot && Math.random() < 0.76) {
+                    next[idx(pullSpot.x, pullSpot.y)] = TYPE.PERSON;
+                    nextAges[idx(pullSpot.x, pullSpot.y)] = 0;
+                    moved = true;
+                  }
+                }
+              }
+              if (moved || Math.random() < 0.58) {
+                next[i] = TYPE.EMPTY;
+                nextAges[i] = 0;
+              }
+            }
+          }
+
+          if (t === TYPE.HOUSE) {
+            const around = countNearby(x, y, PERSON_OR_BUILDING, 2, cells);
+
+            if (Math.random() < 0.09) {
+              const spot = randomEmptyAround(x, y, 1, next, (sx, sy) => {
+                return canOccupyPerson(sx, sy) && hasNearbyType(sx, sy, next, SETTLEMENT, 2);
+              });
+              if (spot) {
+                const si = idx(spot.x, spot.y);
+                next[si] = TYPE.PERSON;
+                nextAges[si] = 0;
+              }
+            }
+
+            if (phase >= 2 && ages[i] > 9 && around >= 4 && Math.random() < 0.24) {
+              next[i] = TYPE.CITY;
+              nextAges[i] = 0;
+              newStructures.push({ x, y });
+            }
+          }
+
+          if (t === TYPE.CITY) {
+            if (Math.random() < 0.11) {
+              const spot = randomEmptyAround(x, y, 1, next, (sx, sy) => {
+                return canOccupyPerson(sx, sy) && hasNearbyType(sx, sy, next, SETTLEMENT, 2);
+              });
+              if (spot) {
+                const si = idx(spot.x, spot.y);
+                next[si] = TYPE.PERSON;
+                nextAges[si] = 0;
+              }
+            }
+
+            if (Math.random() < 0.07) {
+              const build = randomEmptyAround(x, y, 1, next, canBuild);
+              if (build) {
+                const bi = idx(build.x, build.y);
+                next[bi] = TYPE.HOUSE;
+                nextAges[bi] = 0;
+                newStructures.push(build);
+              }
+            }
+          }
+
+          if (t === TYPE.ROAD && phase >= 3 && Math.random() < 0.01) {
+            const spot = randomEmptyAround(x, y, 1, next, canRoad);
+            if (spot) {
+              const si = idx(spot.x, spot.y);
+              next[si] = TYPE.ROAD;
+              nextAges[si] = 0;
+            }
+          }
+        }
+      }
+
+      const structures = collectStructures(next);
+      if (structures.length > 1) {
+        for (let i = 0; i < newStructures.length; i += 1) {
+          const s = newStructures[i];
+          const near = nearestStructure(s, structures);
+          if (near) carveRoad(s, near, next, nextAges);
+        }
+
+        if (phase >= 2) {
+          const attempts = Math.min(6, Math.floor(snapshot.people / 26));
+          for (let i = 0; i < attempts; i += 1) {
+            const a = structures[randInt(structures.length)];
+            const b = nearestStructure(a, structures);
+            if (b) carveRoad(a, b, next, nextAges);
+          }
+        }
+      }
+
+      cells = next;
+      ages = nextAges;
+      sanitizeByTerrain();
+      refreshMetrics();
+    }
+
+    function roadGlyph(x, y, arr) {
+      const left = inBounds(x - 1, y) && arr[idx(x - 1, y)] === TYPE.ROAD;
+      const right = inBounds(x + 1, y) && arr[idx(x + 1, y)] === TYPE.ROAD;
+      const up = inBounds(x, y - 1) && arr[idx(x, y - 1)] === TYPE.ROAD;
+      const down = inBounds(x, y + 1) && arr[idx(x, y + 1)] === TYPE.ROAD;
+
+      if ((left || right) && (up || down)) return "十";
+      if (left || right) return "一";
+      if (up || down) return "丨";
+      return Math.random() < 0.5 ? "路" : "道";
+    }
+
+    function withAlpha(rgba, alpha) {
+      const m = rgba.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/);
+      if (!m) return rgba;
+      const a = Math.max(0.03, Math.min(1, alpha));
+      return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
+    }
+
+    function draw(now) {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#05070b";
+      ctx.fillRect(0, 0, w, h);
+
+      const t = now * 0.001;
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = idx(x, y);
+          const ti = terrain[i];
+          if (ti === TERRAIN.PLAIN) continue;
+          if (hash2(x, y, terrainSeed + 97) % 5 !== 0) continue;
+
+          const cx = x * CELL + CELL * 0.5;
+          const cy = y * CELL + CELL * 0.5;
+          const h1 = hash2(x, y, terrainSeed + 99);
+
+          let glyph = "";
+          let color = "rgba(130,130,130,0.15)";
+          let alpha = 0.12;
+          let fontScale = 0.62;
+
+          if (ti === TERRAIN.WATER) {
+            glyph = h1 % 3 === 0 ? "水" : (h1 % 3 === 1 ? "川" : "≈");
+            color = "rgba(100,145,195,0.22)";
+            alpha = 0.15 + Math.sin(t * 2.3 + x * 0.21 + y * 0.13) * 0.05;
+          } else if (ti === TERRAIN.FOREST) {
+            glyph = h1 % 2 === 0 ? "林" : "木";
+            color = "rgba(95,160,105,0.2)";
+            alpha = (h1 % 4 === 0) ? 0.14 : 0.08;
+          } else if (ti === TERRAIN.MOUNTAIN) {
+            glyph = h1 % 2 === 0 ? "山" : "岳";
+            color = "rgba(165,165,165,0.18)";
+            alpha = 0.1;
+          }
+
+          ctx.font = `300 ${Math.floor(CELL * fontScale)}px ${CHAR_FONT}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = withAlpha(color, alpha);
+          ctx.fillText(glyph, cx, cy);
+        }
+      }
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = idx(x, y);
+          const type = cells[i];
+          if (type === TYPE.EMPTY) continue;
+
+          const cx = x * CELL + CELL * 0.5;
+          const cy = y * CELL + CELL * 0.5;
+          const age = ages[i];
+          const nearPeople = countNearby(x, y, PERSON_OR_BUILDING, 1, cells);
+
+          let glyph = "";
+          let alpha = 0.9;
+          let color = "rgba(255,255,255,0.9)";
+          let fontScale = 0.84;
+
+          if (type === TYPE.PERSON) {
+            glyph = (nearPeople >= 4 || age > 18) ? "众" : "人";
+            color = "rgba(245,245,245,0.92)";
+            alpha = 0.72 + Math.sin(t * 3 + x * 0.13 + y * 0.17) * 0.12;
+          } else if (type === TYPE.HOUSE) {
+            glyph = (nearPeople >= 6 || age > 14) ? "镇" : "村";
+            color = "rgba(226,196,150,0.9)";
+            alpha = 0.85;
+            fontScale = 0.88;
+          } else if (type === TYPE.CITY) {
+            glyph = "城";
+            color = "rgba(180,220,255,0.92)";
+            alpha = 0.88 + Math.sin(t * 2 + x * 0.11) * 0.08;
+            fontScale = 0.94;
+          } else if (type === TYPE.ROAD) {
+            glyph = roadGlyph(x, y, cells);
+            color = "rgba(170,170,170,0.78)";
+            alpha = 0.64;
+            fontScale = 0.72;
+          }
+
+          ctx.font = `300 ${Math.floor(CELL * fontScale)}px ${CHAR_FONT}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = withAlpha(color, alpha);
+          ctx.fillText(glyph, cx, cy);
+        }
+      }
+
+      for (let i = 0; i < walkers.length; i += 1) {
+        const wPos = walkerPosition(walkers[i]);
+        const px = (wPos.x + 0.5) * CELL;
+        const py = (wPos.y + 0.5) * CELL;
+        const g = walkers[i].glyph;
+        ctx.font = `300 ${Math.floor(CELL * 0.92)}px ${CHAR_FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255,230,175,0.9)";
+        ctx.fillText(g, px, py);
+      }
+
+      if (hover.x >= 0 && hover.y >= 0 && inBounds(hover.x, hover.y)) {
+        const x = hover.x * CELL;
+        const y = hover.y * CELL;
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+
+        const i = idx(hover.x, hover.y);
+        if ((cells[i] === TYPE.EMPTY || cells[i] === TYPE.ROAD) && canOccupyPerson(hover.x, hover.y)) {
+          ctx.font = `300 ${Math.floor(CELL * 0.88)}px ${CHAR_FONT}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "rgba(255,255,255,0.3)";
+          ctx.fillText("人", x + CELL * 0.5, y + CELL * 0.5);
+        }
+      }
+    }
+
+    function frame(now) {
+      const dt = now - prevTime;
+      prevTime = now;
+      stepAccumulator += dt;
+      updateWalkers(dt);
+
+      while (stepAccumulator >= STEP_MS) {
+        simulateStep();
+        stepAccumulator -= STEP_MS;
+      }
+
+      draw(now);
+      requestAnimationFrame(frame);
+    }
+
+    canvas.addEventListener("pointermove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / CELL);
+      const y = Math.floor((e.clientY - rect.top) / CELL);
+      hover.x = x;
+      hover.y = y;
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      hover.x = -1;
+      hover.y = -1;
+    });
+
+    canvas.addEventListener("pointerdown", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / CELL);
+      const y = Math.floor((e.clientY - rect.top) / CELL);
+      placePerson(x, y);
+    });
+
+    window.addEventListener("resize", resize);
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key.toLowerCase() === "r") {
+        resetWorld();
+      }
+      if (e.key.toLowerCase() === "p") {
+        scatterPeople(e.shiftKey ? 40 : 14);
+      }
+      if (e.code === "Space") {
+        e.preventDefault();
+        paused = !paused;
+        refreshMetrics();
+      }
+    });
+
+    resize();
+    refreshMetrics();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

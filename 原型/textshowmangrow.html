@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中华文明与濒危生态图景 - Civilization & Ecology</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+            font-family: "SimHei", "Microsoft YaHei", sans-serif; 
+            cursor: grab;
+        }
+        body:active {
+            cursor: grabbing;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            pointer-events: none;
+            letter-spacing: 1px;
+            line-height: 1.6;
+            text-shadow: 0 0 5px #000;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-left: 3px solid #FFF;
+        }
+        .legend {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .legend-city { background: #CCC; font-size: 10px; text-align: center; line-height: 12px; }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FFF;
+            font-size: 18px;
+            letter-spacing: 2px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div id="loading">正在生成文明疆域与生态粒子...</div>
+    <canvas id="civCanvas"></canvas>
+    <div id="ui">
+        <b>【中华文明与濒危生态图景】</b><br>
+        <span style="font-size: 12px; color: #AAA;">拖拽平移 | 滚轮缩放视图 (基于真实地理坐标)</span><br><br>
+        <div style="font-size: 13px;">
+            <span class="legend legend-city">字</span> <b>字符：</b>人类扩张的痕迹 (真实城市群落)<br>
+            <span class="legend legend-city">界</span> <b>边界：</b>政治划分的边防界限
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('civCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingDiv = document.getElementById('loading');
+
+        // --- 核心设定 ---
+        const baseFontSize = 18; // 基础网格大小
+        let camera = { x: 0, y: 0, zoom: 0.45 };
+        
+        // 地理掩码数据 (R通道: 陆地, G通道: 边界)
+        let maskData = null;
+        let maskW = 2048, maskH = 2048;
+        let bounds = { minLon: 180, maxLon: -180, minLat: 90, maxLat: -90 };
+        let centerLon = 0, centerLat = 0;
+
+        // --- 真实城市坐标与权重 (用于生成拟真的文明辐射区) ---
+        const realCities = [
+            {lon: 116.40, lat: 39.90, w: 1.0}, // 北京 (京津冀核心)
+            {lon: 117.20, lat: 39.08, w: 0.8}, // 天津
+            {lon: 121.47, lat: 31.23, w: 1.0}, // 上海 (长三角核心)
+            {lon: 120.15, lat: 30.28, w: 0.8}, // 杭州
+            {lon: 118.79, lat: 32.06, w: 0.8}, // 南京
+            {lon: 113.26, lat: 23.12, w: 0.9}, // 广州 (珠三角核心)
+            {lon: 114.05, lat: 22.54, w: 0.9}, // 深圳
+            {lon: 104.06, lat: 30.65, w: 0.8}, // 成都
+            {lon: 106.50, lat: 29.53, w: 0.8}, // 重庆
+            {lon: 114.30, lat: 30.59, w: 0.8}, // 武汉
+            {lon: 108.94, lat: 34.26, w: 0.7}, // 西安
+            {lon: 113.62, lat: 34.74, w: 0.7}, // 郑州
+            {lon: 112.93, lat: 28.22, w: 0.7}, // 长沙
+            {lon: 123.42, lat: 41.80, w: 0.6}, // 沈阳
+            {lon: 117.00, lat: 36.65, w: 0.6}, // 济南
+            {lon: 117.22, lat: 31.82, w: 0.6}, // 合肥
+            {lon: 119.30, lat: 26.07, w: 0.6}, // 福州
+            {lon: 126.63, lat: 45.75, w: 0.5}, // 哈尔滨
+            {lon: 102.71, lat: 25.04, w: 0.5}, // 昆明
+            {lon: 87.61,  lat: 43.79, w: 0.4}, // 乌鲁木齐
+            {lon: 103.83, lat: 36.06, w: 0.4}, // 兰州
+            {lon: 111.67, lat: 40.81, w: 0.4}, // 呼和浩特
+            {lon: 108.32, lat: 22.81, w: 0.5}, // 南宁
+            {lon: 106.71, lat: 26.57, w: 0.5}, // 贵阳
+            {lon: 125.32, lat: 43.81, w: 0.5}, // 长春
+            {lon: 118.08, lat: 24.47, w: 0.6}, // 厦门
+            {lon: 120.38, lat: 36.06, w: 0.6}, // 青岛
+            {lon: 121.61, lat: 38.91, w: 0.5}  // 大连
+        ];
+
+        // --- 人类文明字典 (代表对自然的覆盖与改造) ---
+        const charsBorder = ['界', '疆', '防', '戍', '卫', '卡', '哨', '线', '壁']; // 政治边防
+        const charsCity = ['城', '网', '人', '市', '电', '芯', '车', '楼', '算', '厂']; // 高度工业/数据化
+        const charsRural = ['乡', '镇', '村', '农', '田', '路', '舍', '渠', '集', '桥']; // 农业与基建
+        const charsWild = ['迹', '探', '测', '矿', '伐', '猎', '越']; // 人类在荒野的极简痕迹
+        const charsNature = ['林', '森', '野', '山', '谷', '川', '渊', '莽', '岭']; // 原始森林与自然地貌
+        const seaChars = ['·', '。', ' ', ' '];
+
+        // --- 噪声算法 ---
+        function hash(x, y) {
+            let h = Math.imul(x, 374761393) + Math.imul(y, 668265263);
+            h = Math.imul(h ^ (h >>> 13), 1274126177);
+            return (h ^ (h >>> 16)) >>> 0; 
+        }
+        function randomValue(x, y) { return hash(x, y) / 4294967296.0; }
+        function lerp(a, b, t) { return a + t * (b - a); }
+        function smoothstep(t) { return t * t * (3.0 - 2.0 * t); }
+        function valueNoise(x, y) {
+            let xi = Math.floor(x), yi = Math.floor(y);
+            let xf = x - xi, yf = y - yi;
+            let u = smoothstep(xf), v = smoothstep(yf);
+            return lerp(lerp(randomValue(xi, yi), randomValue(xi + 1, yi), u), 
+                        lerp(randomValue(xi, yi + 1), randomValue(xi + 1, yi + 1), u), v);
+        }
+        // 分形布朗运动，返回值域近似 [0.0, 1.75]
+        function fbm(x, y) {
+            return valueNoise(x, y) + 0.5 * valueNoise(x * 2, y * 2) + 0.25 * valueNoise(x * 4, y * 4);
+        }
+
+        // --- 地理数据初始化 (提取面与边界) ---
+        async function initGeoData() {
+            try {
+                // 使用不带_full的接口，主要获取纯粹的国家轮廓，强化“边防疆界”的概念
+                const res = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000.json');
+                const geojson = await res.json();
+
+                const polygons = [];
+                geojson.features.forEach(feat => {
+                    if (!feat.geometry) return;
+                    let polys = feat.geometry.type === 'Polygon' ? [feat.geometry.coordinates[0]] :
+                                feat.geometry.type === 'MultiPolygon' ? feat.geometry.coordinates.map(c => c[0]) : [];
+                    
+                    polys.forEach(poly => {
+                        polygons.push(poly);
+                        poly.forEach(([lon, lat]) => {
+                            if (lon < bounds.minLon) bounds.minLon = lon;
+                            if (lon > bounds.maxLon) bounds.maxLon = lon;
+                            if (lat < bounds.minLat) bounds.minLat = lat;
+                            if (lat > bounds.maxLat) bounds.maxLat = lat;
+                        });
+                    });
+                });
+
+                centerLon = (bounds.minLon + bounds.maxLon) / 2;
+                centerLat = (bounds.minLat + bounds.maxLat) / 2;
+
+                const mCanvas = document.createElement('canvas');
+                mCanvas.width = maskW; mCanvas.height = maskH;
+                const mCtx = mCanvas.getContext('2d');
+
+                // 1. 绘制陆地内部 (红色通道)
+                mCtx.fillStyle = '#FF0000';
+                polygons.forEach(poly => {
+                    mCtx.beginPath();
+                    poly.forEach(([lon, lat], i) => {
+                        let x = (lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * maskW;
+                        let y = (bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat) * maskH;
+                        if (i === 0) mCtx.moveTo(x, y);
+                        else mCtx.lineTo(x, y);
+                    });
+                    mCtx.closePath();
+                    mCtx.fill();
+                });
+
+                // 2. 绘制政治边界轮廓 (绿色通道)
+                // 设置合适的线宽，确保在网格采样时能被捕捉到
+                mCtx.lineWidth = 4; 
+                mCtx.strokeStyle = '#00FF00';
+                polygons.forEach(poly => {
+                    mCtx.beginPath();
+                    poly.forEach(([lon, lat], i) => {
+                        let x = (lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * maskW;
+                        let y = (bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat) * maskH;
+                        if (i === 0) mCtx.moveTo(x, y);
+                        else mCtx.lineTo(x, y);
+                    });
+                    mCtx.closePath();
+                    mCtx.stroke();
+                });
+
+                maskData = mCtx.getImageData(0, 0, maskW, maskH);
+                loadingDiv.style.display = 'none';
+
+                resize();
+                centerCamera();
+                requestAnimationFrame(draw);
+
+            } catch (err) {
+                loadingDiv.innerText = "数据接入失败。";
+                console.error(err);
+            }
+        }
+
+        // --- 交互控制 ---
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        function centerCamera() { camera.x = canvas.width / 2; camera.y = canvas.height / 2; }
+
+        let isDragging = false, lastMouse = { x: 0, y: 0 };
+        canvas.addEventListener('mousedown', e => { isDragging = true; lastMouse = { x: e.clientX, y: e.clientY }; });
+        window.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            camera.x += (e.clientX - lastMouse.x); camera.y += (e.clientY - lastMouse.y);
+            lastMouse = { x: e.clientX, y: e.clientY };
+        });
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            let zoomFactor = e.deltaY > 0 ? 0.85 : 1.15;
+            let mouseWorldX = (e.clientX - camera.x) / camera.zoom;
+            let mouseWorldY = (e.clientY - camera.y) / camera.zoom;
+
+            camera.zoom *= zoomFactor;
+            camera.zoom = Math.max(0.15, Math.min(camera.zoom, 3.5)); // 限制缩放极值
+
+            camera.x = e.clientX - mouseWorldX * camera.zoom;
+            camera.y = e.clientY - mouseWorldY * camera.zoom;
+        }, { passive: false });
+
+
+        // --- 核心渲染引擎 ---
+        function draw() {
+            // 背景深邃的黑
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!maskData) return;
+
+            ctx.save();
+            ctx.translate(camera.x, camera.y);
+            ctx.scale(camera.zoom, camera.zoom);
+
+            let startCol = Math.floor(-camera.x / (baseFontSize * camera.zoom)) - 1;
+            let startRow = Math.floor(-camera.y / (baseFontSize * camera.zoom)) - 1;
+            let endCol = startCol + Math.ceil(canvas.width / (baseFontSize * camera.zoom)) + 2;
+            let endRow = startRow + Math.ceil(canvas.height / (baseFontSize * camera.zoom)) + 2;
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            let time = Date.now();
+
+            let renderSize = baseFontSize * camera.zoom;
+            let useText = renderSize >= 6; // 当镜头拉得很远时，直接画方块优化性能
+
+            let degPerCellX = 0.15;
+            let degPerCellY = 0.15 * Math.cos(centerLat * Math.PI / 180);
+
+            for (let y = startRow; y <= endRow; y++) {
+                for (let x = startCol; x <= endCol; x++) {
+                    let cellHash = randomValue(x, y);
+                    let lon = centerLon + x * degPerCellX;
+                    let lat = centerLat - y * degPerCellY; 
+
+                    let isLand = false;
+                    let isBorder = false;
+                    
+                    if (lon >= bounds.minLon && lon <= bounds.maxLon && lat >= bounds.minLat && lat <= bounds.maxLat) {
+                        let mx = Math.floor((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * maskW);
+                        let my = Math.floor((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat) * maskH);
+                        let idx = (my * maskW + mx) * 4;
+                        
+                        // 红色通道 > 128 代表陆地
+                        if (maskData.data[idx] > 128) isLand = true;
+                        // 绿色通道 > 128 代表边防边界线
+                        if (maskData.data[idx+1] > 128) isBorder = true;
+                    }
+
+                    // --- 渲染逻辑分支 ---
+                    
+                    if (isBorder) {
+                        // 1. 边防界线：高密度的人类政治象征
+                        let charIdx = Math.floor((time / 4000) + cellHash * 100) % charsBorder.length;
+                        let op = 0.5 + 0.3 * Math.sin(time / 2000 + cellHash * 5);
+                        ctx.fillStyle = `rgba(180, 180, 180, ${op})`; // 稍暗的冷灰色
+                        
+                        if (useText) {
+                            ctx.font = `bold ${baseFontSize * 0.9}px "SimHei", sans-serif`;
+                            ctx.fillText(charsBorder[charIdx], x * baseFontSize + baseFontSize/2, y * baseFontSize + baseFontSize/2);
+                        } else {
+                            ctx.fillRect(x * baseFontSize + baseFontSize*0.2, y * baseFontSize + baseFontSize*0.2, baseFontSize*0.6, baseFontSize*0.6);
+                        }
+                        
+                    } else if (isLand) {
+                        // 计算真实城市辐射影响度
+                        let cityInfluence = 0;
+                        for (let c of realCities) {
+                            // 经度需根据纬度进行余弦补偿以计算准确地理距离
+                            let dx = (lon - c.lon) * Math.cos(c.lat * Math.PI / 180);
+                            let dy = lat - c.lat;
+                            let dist = Math.sqrt(dx*dx + dy*dy);
+                            
+                            // 辐射半径 (经纬度差值，1度约110公里)
+                            let influenceRadius = 2.0 * c.w; 
+                            if (dist < influenceRadius) {
+                                // 距离越近，权重越高 (平滑衰减)
+                                let falloff = Math.pow(1 - dist / influenceRadius, 2);
+                                cityInfluence += falloff * c.w;
+                            }
+                        }
+                        
+                        // 【核心更新】引入“胡焕庸线”地理权重：东部底噪高，西部底噪极低
+                        // 经度 100 (约甘肃、四川一线) 以西权重急剧下降，120 以东达到满值
+                        let geoWeight = Math.max(0.0, Math.min(1.0, (lon - 100) / 20));
+                        
+                        // 自然扩张噪声：如果在西部且远离大城市，则强制归零，防止凭空刷出高密度乡镇
+                        let organicNoise = fbm(x * 0.1, y * 0.1) * 0.3;
+                        if (cityInfluence < 0.05) {
+                            organicNoise *= geoWeight; 
+                        }
+                        
+                        let popNoise = cityInfluence + organicNoise;
+
+                        // 2. 超级城市层 (高人口密度区)
+                        if (popNoise > 0.7) {
+                            // 叙事特征：极致的细分与拥挤，颗粒度变细
+                            if (useText) {
+                                // 将一个大网格划分为 2x2 的细密小网格
+                                ctx.font = `${baseFontSize * 0.45}px "SimHei", sans-serif`;
+                                for(let dy = 0; dy < 2; dy++) {
+                                    for(let dx = 0; dx < 2; dx++) {
+                                        let subHash = randomValue(x + dx*0.5, y + dy*0.5);
+                                        // 城市填充率：根据中心地带变得极高
+                                        if (subHash > Math.max(0.1, 1.2 - popNoise)) {
+                                            let charIdx = Math.floor((time / 1500) + subHash * 100) % charsCity.length;
+                                            let op = 0.6 + 0.4 * Math.sin(time / 1000 + subHash * 10);
+                                            ctx.fillStyle = `rgba(255, 255, 255, ${op})`;
+                                            
+                                            let px = x * baseFontSize + (dx * 0.5 + 0.25) * baseFontSize;
+                                            let py = y * baseFontSize + (dy * 0.5 + 0.25) * baseFontSize;
+                                            ctx.fillText(charsCity[charIdx], px, py);
+                                        }
+                                    }
+                                }
+                            } else {
+                                // 远景下的城市群落：大块的高亮方块矩阵
+                                ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + 0.3 * Math.sin(time/1000 + cellHash*5)})`;
+                                ctx.fillRect(x * baseFontSize + 1, y * baseFontSize + 1, baseFontSize - 2, baseFontSize - 2);
+                            }
+                            
+                        // 3. 乡镇/农业层 (中等人口密度区)
+                        } else if (popNoise > 0.2) {
+                            // 叙事特征：常规网格，密度逐渐稀疏，受 popNoise 影响
+                            let fillRate = popNoise / 0.7; // 归一化
+                            if (cellHash < fillRate * 0.5) { // 降低最高填充到 50%
+                                let charIdx = Math.floor((time / 3000) + cellHash * 100) % charsRural.length;
+                                ctx.fillStyle = `rgba(200, 200, 200, 0.4)`;
+                                if (useText) {
+                                    ctx.font = `${baseFontSize * 0.8}px "SimHei", sans-serif`;
+                                    ctx.fillText(charsRural[charIdx], x * baseFontSize + baseFontSize/2, y * baseFontSize + baseFontSize/2);
+                                } else {
+                                    ctx.fillRect(x * baseFontSize + baseFontSize*0.3, y * baseFontSize + baseFontSize*0.3, baseFontSize*0.4, baseFontSize*0.4);
+                                }
+                            }
+                            
+                        // 4. 荒野、无人区与原始森林 (极低人口密度区)
+                        } else {
+                            // 叙事特征：极其空旷，用独立的噪声生成地貌，强调“极致的留白”
+                            let natureNoise = fbm(x * 0.06 + 100, y * 0.06 + 100);
+                            
+                            if (natureNoise > 0.65) {
+                                // 【原始森林/山脉区】: 极低密度点缀，展现自然脉络
+                                if (cellHash < 0.015) { // 降低到仅有 1.5% 的填充率
+                                    let charIdx = Math.floor((time / 6000) + cellHash * 100) % charsNature.length;
+                                    ctx.fillStyle = `rgba(255, 255, 255, 0.15)`; // 极其幽暗的白色，退居背景
+                                    if (useText) {
+                                        ctx.font = `${baseFontSize * 0.7}px "SimHei", sans-serif`;
+                                        ctx.fillText(charsNature[charIdx], x * baseFontSize + baseFontSize/2, y * baseFontSize + baseFontSize/2);
+                                    } else {
+                                        // 远景下自然字符退化为极小的暗色微尘
+                                        ctx.fillRect(x * baseFontSize + baseFontSize*0.4, y * baseFontSize + baseFontSize*0.4, baseFontSize*0.2, baseFontSize*0.2);
+                                    }
+                                }
+                            } else {
+                                // 【纯粹无人区/荒漠】: 人类字符极度稀少，大面积的绝对留白
+                                if (cellHash < 0.001) {  // 概率压到极低，仅千分之一
+                                    let charIdx = Math.floor((time / 5000) + cellHash * 100) % charsWild.length;
+                                    ctx.fillStyle = `rgba(150, 150, 150, 0.25)`;
+                                    if (useText) {
+                                        ctx.font = `${baseFontSize * 0.6}px "SimHei", sans-serif`;
+                                        ctx.fillText(charsWild[charIdx], x * baseFontSize + baseFontSize/2, y * baseFontSize + baseFontSize/2);
+                                    }
+                                }
+                            }
+                        }
+
+                    } else {
+                        // 5. 海洋与化外之地
+                        if (cellHash > 0.98) { 
+                            let charIdx = Math.floor((time / 8000) + cellHash * 100) % seaChars.length;
+                            ctx.fillStyle = `rgba(255, 255, 255, 0.03)`;
+                            if (useText) {
+                                ctx.font = `${baseFontSize}px "SimHei", sans-serif`;
+                                ctx.fillText(seaChars[charIdx], x * baseFontSize + baseFontSize/2, y * baseFontSize + baseFontSize/2);
+                            }
+                        }
+                    }
+                }
+            }
+
+            ctx.restore();
+            requestAnimationFrame(draw);
+        }
+
+        initGeoData();
+
+    </script>
+</body>
+</html>

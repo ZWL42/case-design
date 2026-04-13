@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>华南虎 · 三阶段粒子叙事</title>
+  <style>
+    :root {
+      --bg: #080a0d;
+      --panel: rgba(10, 13, 18, 0.78);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: rgba(245, 245, 245, 0.92);
+      --muted: rgba(200, 206, 214, 0.68);
+      --accent: #f09a3e;
+      --danger: #c95a4f;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+    }
+
+    #scene {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: radial-gradient(circle at 65% 70%, #0f1620 0%, #080a0d 58%);
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 10;
+      backdrop-filter: blur(7px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    #story {
+      left: 14px;
+      top: 14px;
+      width: min(460px, 94vw);
+      padding: 12px 14px;
+      line-height: 1.65;
+    }
+
+    #story h1 {
+      margin: 0 0 6px 0;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: #ffe1c0;
+    }
+
+    #story .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    #stage-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffd1a6;
+      margin-bottom: 3px;
+    }
+
+    #stage-desc {
+      font-size: 12px;
+      color: rgba(240, 240, 240, 0.85);
+      min-height: 38px;
+    }
+
+    #stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+
+    .kv {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 7px;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .kv .k { color: rgba(210, 214, 220, 0.7); }
+    .kv .v { color: #fff2dd; font-weight: 600; margin-left: 4px; }
+
+    #controls {
+      right: 14px;
+      top: 14px;
+      width: min(340px, 92vw);
+      padding: 12px 12px 10px;
+      max-height: calc(100vh - 28px);
+      overflow: auto;
+    }
+
+    #controls h2 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      color: rgba(255, 230, 199, 0.9);
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+
+    .row { margin-bottom: 8px; }
+
+    .row label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: rgba(232, 236, 241, 0.84);
+      margin-bottom: 4px;
+    }
+
+    .row input[type="range"],
+    .row select {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 7px;
+      padding: 4px 6px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin: 8px 0;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.03);
+      color: #f1f3f6;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    button.active {
+      border-color: rgba(240, 154, 62, 0.8);
+      background: rgba(240, 154, 62, 0.16);
+      color: #ffe5ca;
+    }
+
+    #note {
+      font-size: 10px;
+      color: rgba(195, 200, 210, 0.7);
+      line-height: 1.6;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    #footer {
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      z-index: 10;
+      font-size: 11px;
+      color: rgba(220, 224, 230, 0.8);
+      background: rgba(8, 10, 13, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(7, 9, 12, 0.86);
+      color: rgba(255, 242, 225, 0.92);
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      backdrop-filter: blur(3px);
+    }
+
+    @media (max-width: 900px) {
+      #story { width: min(96vw, 520px); }
+      #controls {
+        top: auto;
+        bottom: 14px;
+        right: 14px;
+        max-height: 48vh;
+      }
+      #footer { bottom: calc(48vh + 22px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene"></canvas>
+    <div id="loading">正在加载华南地区公开边界数据...</div>
+
+    <section id="story" class="panel">
+      <h1>华南虎（South China Tiger）文字与粒子叙事</h1>
+      <div class="sub">空间范围：华南山地带（公开省界 GeoJSON 采样） · 历史记载峰值估计约 4000 只</div>
+      <div id="stage-title"></div>
+      <div id="stage-desc"></div>
+      <div id="stats"></div>
+    </section>
+
+    <aside id="controls" class="panel">
+      <h2>阶段控制</h2>
+      <div class="buttons" id="stage-buttons"></div>
+
+      <div class="row">
+        <label><span>粒子移动算法</span><span id="v-model"></span></label>
+        <select id="model">
+          <option value="adaptive">仿生游猎（默认）</option>
+          <option value="territorial">领地巡游</option>
+          <option value="corridor">廊道迁移</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label><span>速度</span><span id="v-speed"></span></label>
+        <input id="speed" type="range" min="0.4" max="2.2" step="0.01" value="1.08" />
+      </div>
+      <div class="row">
+        <label><span>随机扰动</span><span id="v-noise"></span></label>
+        <input id="noise" type="range" min="0" max="1.6" step="0.01" value="0.78" />
+      </div>
+      <div class="row">
+        <label><span>聚合倾向</span><span id="v-cohesion"></span></label>
+        <input id="cohesion" type="range" min="0" max="2" step="0.01" value="0.92" />
+      </div>
+      <div class="row">
+        <label><span>分离倾向</span><span id="v-separation"></span></label>
+        <input id="separation" type="range" min="0" max="2.2" step="0.01" value="1.18" />
+      </div>
+      <div class="row">
+        <label><span>人类影响强度</span><span id="v-pressure"></span></label>
+        <input id="pressure" type="range" min="0" max="2.2" step="0.01" value="1.0" />
+      </div>
+      <div class="row">
+        <label><span>迁移趋向</span><span id="v-migrate"></span></label>
+        <input id="migrate" type="range" min="0" max="2" step="0.01" value="1.0" />
+      </div>
+
+      <div class="buttons">
+        <button id="auto">自动演进：关</button>
+        <button id="reseeding">重置粒子</button>
+        <button id="ghost">灭绝痕迹：开</button>
+      </div>
+
+      <div id="note">
+        说明：粒子颜色采用偏狮群的橙色系，阶段越靠后，人类活动压力场越强，粒子会出现减少与迁移。
+        你可以切换三种算法与滑杆参数，选定最适合你叙事节奏的动态。
+      </div>
+    </aside>
+
+    <div id="footer">快捷键：1/2/3 阶段切换 · A 自动演进 · M 切换算法 · G 灭绝痕迹 · R 重置</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d");
+
+    const stageTitleEl = document.getElementById("stage-title");
+    const stageDescEl = document.getElementById("stage-desc");
+    const statsEl = document.getElementById("stats");
+    const stageButtonsEl = document.getElementById("stage-buttons");
+
+    const controls = {
+      model: document.getElementById("model"),
+      speed: document.getElementById("speed"),
+      noise: document.getElementById("noise"),
+      cohesion: document.getElementById("cohesion"),
+      separation: document.getElementById("separation"),
+      pressure: document.getElementById("pressure"),
+      migrate: document.getElementById("migrate"),
+      auto: document.getElementById("auto"),
+      reseeding: document.getElementById("reseeding"),
+      ghost: document.getElementById("ghost")
+    };
+
+    const valueEls = {
+      model: document.getElementById("v-model"),
+      speed: document.getElementById("v-speed"),
+      noise: document.getElementById("v-noise"),
+      cohesion: document.getElementById("v-cohesion"),
+      separation: document.getElementById("v-separation"),
+      pressure: document.getElementById("v-pressure"),
+      migrate: document.getElementById("v-migrate")
+    };
+
+    const STAGES = [
+      {
+        id: 1,
+        title: "阶段一 · 山林主导（人类影响弱）",
+        period: "历史早期",
+        desc: "华南虎在华南山地与丘陵林地中保持较大分布，迁移与捕猎通道连续，种群仍具规模。",
+        historicalPeak: "约 4000 只（历史记载峰值估计）",
+        pressure: 0.12,
+        targetParticles: 760,
+        collapseRisk: 0.0003
+      },
+      {
+        id: 2,
+        title: "阶段二 · 开发扩张（灭绝迹象出现）",
+        period: "20世纪中后段",
+        desc: "道路、聚落与猎压叠加，生境开始碎裂。局部区域出现‘空白带’，种群明显下滑并迁移。",
+        historicalPeak: "由峰值快速回落",
+        pressure: 0.52,
+        targetParticles: 270,
+        collapseRisk: 0.0028
+      },
+      {
+        id: 3,
+        title: "阶段三 · 极危现实（保护难度高）",
+        period: "当代",
+        desc: "高强度人类活动持续压缩栖息地，迁移路径受阻，野外生存极其困难，保护与恢复面临高难度。",
+        historicalPeak: "野外种群极低 / 难以保护",
+        pressure: 0.92,
+        targetParticles: 42,
+        collapseRisk: 0.0085
+      }
+    ];
+
+    const NATURE_TEXT = ["林", "山", "岭", "谷", "水", "泽"];
+    const HUMAN_TEXT = ["人", "众", "村", "镇", "城", "路", "厂", "矿", "网"];
+
+    const SOUTH_PROVINCES = [
+      { code: "500000", name: "重庆" },
+      { code: "520000", name: "贵州" },
+      { code: "430000", name: "湖南" },
+      { code: "420000", name: "湖北" },
+      { code: "360000", name: "江西" },
+      { code: "350000", name: "福建" },
+      { code: "440000", name: "广东" },
+      { code: "450000", name: "广西" }
+    ];
+
+    const CITY_HOTSPOTS_LL = [
+      { lon: 113.264, lat: 23.129, r: 0.08, w: 1.0 },   // 广州
+      { lon: 114.058, lat: 22.543, r: 0.07, w: 0.95 },  // 深圳
+      { lon: 112.938, lat: 28.228, r: 0.075, w: 0.92 }, // 长沙
+      { lon: 115.858, lat: 28.683, r: 0.072, w: 0.86 }, // 南昌
+      { lon: 119.296, lat: 26.074, r: 0.07, w: 0.82 },  // 福州
+      { lon: 106.63,  lat: 26.647, r: 0.07, w: 0.78 },  // 贵阳
+      { lon: 108.32,  lat: 22.82,  r: 0.07, w: 0.75 },  // 南宁
+      { lon: 114.305, lat: 30.592, r: 0.07, w: 0.74 },  // 武汉
+      { lon: 106.551, lat: 29.563, r: 0.07, w: 0.73 }   // 重庆
+    ];
+
+    const ROAD_SEGMENTS_LL = [
+      { a: { lon: 106.551, lat: 29.563 }, b: { lon: 113.264, lat: 23.129 }, w: 0.85, r: 0.03 },
+      { a: { lon: 112.938, lat: 28.228 }, b: { lon: 119.296, lat: 26.074 }, w: 0.74, r: 0.028 },
+      { a: { lon: 108.32,  lat: 22.82  }, b: { lon: 114.058, lat: 22.543 }, w: 0.7,  r: 0.025 }
+    ];
+
+    const REFUGES_LL = [
+      { lon: 110.43, lat: 25.85, w: 1.0 },  // 猫儿山
+      { lon: 112.25, lat: 24.55, w: 0.95 }, // 南岭
+      { lon: 113.75, lat: 26.28, w: 0.9 },  // 罗霄山
+      { lon: 117.72, lat: 27.75, w: 0.86 }, // 武夷山
+      { lon: 110.35, lat: 27.45, w: 0.82 }  // 雪峰山
+    ];
+
+    const CORRIDORS_LL = [
+      [
+        { lon: 117.72, lat: 27.75 },
+        { lon: 115.9,  lat: 27.0  },
+        { lon: 113.9,  lat: 26.3  },
+        { lon: 112.2,  lat: 24.8  },
+        { lon: 110.43, lat: 25.85 }
+      ],
+      [
+        { lon: 114.4, lat: 29.0 },
+        { lon: 113.2, lat: 28.1 },
+        { lon: 111.7, lat: 27.1 },
+        { lon: 110.35, lat: 27.45 }
+      ]
+    ];
+
+    const SETTINGS = {
+      speed: parseFloat(controls.speed.value),
+      noise: parseFloat(controls.noise.value),
+      cohesion: parseFloat(controls.cohesion.value),
+      separation: parseFloat(controls.separation.value),
+      pressure: parseFloat(controls.pressure.value),
+      migrate: parseFloat(controls.migrate.value),
+      model: controls.model.value,
+      auto: false,
+      ghost: true
+    };
+
+    let W = 0;
+    let H = 0;
+    let DPR = 1;
+    let particles = [];
+    let stageIndex = 0;
+    let currentStage = STAGES[0];
+    let targetCount = currentStage.targetParticles;
+    let extinctionMarks = [];
+    let mapCanvas = document.createElement("canvas");
+    let mapCtx = mapCanvas.getContext("2d");
+    let loadingEl = document.getElementById("loading");
+    let tPrev = performance.now();
+    let autoClock = 0;
+    let geoReady = false;
+    let geoBounds = null;
+    let geoPolygons = [];
+    let provinceLabels = [];
+    let CITY_HOTSPOTS = [];
+    let ROAD_SEGMENTS = [];
+    let REFUGES = [];
+    let CORRIDORS = [];
+
+    function clamp(v, a, b) {
+      return Math.max(a, Math.min(b, v));
+    }
+
+    function rand(a = 0, b = 1) {
+      return a + Math.random() * (b - a);
+    }
+
+    function mix(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function dist2(ax, ay, bx, by) {
+      const dx = ax - bx;
+      const dy = ay - by;
+      return dx * dx + dy * dy;
+    }
+
+    function len(x, y) {
+      return Math.hypot(x, y) || 1e-6;
+    }
+
+    function distPointToSeg(px, py, ax, ay, bx, by) {
+      const vx = bx - ax;
+      const vy = by - ay;
+      const wx = px - ax;
+      const wy = py - ay;
+      const c1 = vx * wx + vy * wy;
+      if (c1 <= 0) return Math.hypot(px - ax, py - ay);
+      const c2 = vx * vx + vy * vy;
+      if (c2 <= c1) return Math.hypot(px - bx, py - by);
+      const t = c1 / c2;
+      const qx = ax + t * vx;
+      const qy = ay + t * vy;
+      return Math.hypot(px - qx, py - qy);
+    }
+
+    function pointInRing(x, y, ring) {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i].x;
+        const yi = ring[i].y;
+        const xj = ring[j].x;
+        const yj = ring[j].y;
+        const intersect = ((yi > y) !== (yj > y)) &&
+          (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-9) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function pointInRegion(x, y) {
+      for (let i = 0; i < geoPolygons.length; i += 1) {
+        const poly = geoPolygons[i];
+        if (!pointInRing(x, y, poly.outer)) continue;
+        let inHole = false;
+        for (let h = 0; h < poly.holes.length; h += 1) {
+          if (pointInRing(x, y, poly.holes[h])) {
+            inHole = true;
+            break;
+          }
+        }
+        if (!inHole) return true;
+      }
+      return false;
+    }
+
+    function llToNorm(lon, lat) {
+      if (!geoBounds) return { x: 0.5, y: 0.5 };
+      const pad = 0.06;
+      const nx = (lon - geoBounds.minLon) / (geoBounds.maxLon - geoBounds.minLon);
+      const ny = (geoBounds.maxLat - lat) / (geoBounds.maxLat - geoBounds.minLat);
+      return {
+        x: pad + nx * (1 - pad * 2),
+        y: pad + ny * (1 - pad * 2)
+      };
+    }
+
+    function normToLL(x, y) {
+      if (!geoBounds) return { lon: 112, lat: 26 };
+      const pad = 0.06;
+      const nx = clamp((x - pad) / (1 - pad * 2), 0, 1);
+      const ny = clamp((y - pad) / (1 - pad * 2), 0, 1);
+      return {
+        lon: geoBounds.minLon + nx * (geoBounds.maxLon - geoBounds.minLon),
+        lat: geoBounds.maxLat - ny * (geoBounds.maxLat - geoBounds.minLat)
+      };
+    }
+
+    function normalizeGeoModels() {
+      CITY_HOTSPOTS = CITY_HOTSPOTS_LL.map((h) => {
+        const p = llToNorm(h.lon, h.lat);
+        return { x: p.x, y: p.y, r: h.r, w: h.w };
+      });
+
+      ROAD_SEGMENTS = ROAD_SEGMENTS_LL.map((s) => {
+        const a = llToNorm(s.a.lon, s.a.lat);
+        const b = llToNorm(s.b.lon, s.b.lat);
+        return { a, b, w: s.w, r: s.r };
+      });
+
+      REFUGES = REFUGES_LL.map((r) => {
+        const p = llToNorm(r.lon, r.lat);
+        return { x: p.x, y: p.y, w: r.w };
+      });
+
+      CORRIDORS = CORRIDORS_LL.map((line) => line.map((p) => llToNorm(p.lon, p.lat)));
+    }
+
+    function terrainShade(x, y) {
+      const ll = normToLL(x, y);
+      const westHigh = clamp((111.5 - ll.lon) / 10.5, 0, 1);
+      const ridgeWave = 0.5 + 0.5 * Math.sin(ll.lon * 0.62 + ll.lat * 1.17);
+      const localRough = 0.5 + 0.5 * Math.sin(ll.lon * 2.9 - ll.lat * 3.8 + Math.sin(ll.lat * 0.8));
+      const coastPenalty = clamp((ll.lon - 116.2) / 5.5, 0, 1) * clamp((25 - ll.lat) / 8.5, 0, 1);
+      return clamp(0.24 + westHigh * 0.38 + ridgeWave * 0.22 + localRough * 0.18 - coastPenalty * 0.26, 0, 1);
+    }
+
+    function inHabitat(x, y) {
+      if (!geoReady) return false;
+      if (!pointInRegion(x, y)) return false;
+      const suit = terrainShade(x, y);
+      return suit > 0.2;
+    }
+
+    async function loadSouthChinaGeoData() {
+      const rawPolys = [];
+      const labels = [];
+      const bounds = { minLon: Infinity, maxLon: -Infinity, minLat: Infinity, maxLat: -Infinity };
+
+      for (let i = 0; i < SOUTH_PROVINCES.length; i += 1) {
+        const prov = SOUTH_PROVINCES[i];
+        const url = `https://geo.datav.aliyun.com/areas_v3/bound/${prov.code}_full.json`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`boundary fetch failed: ${prov.code}`);
+        const geo = await res.json();
+
+        if (!labels.some((d) => d.name === prov.name)) {
+          const center = geo.features && geo.features[0] && geo.features[0].properties && geo.features[0].properties.center;
+          if (Array.isArray(center) && center.length >= 2) {
+            labels.push({ name: prov.name, lon: center[0], lat: center[1] });
+          }
+        }
+
+        (geo.features || []).forEach((feat) => {
+          if (!feat.geometry) return;
+          const g = feat.geometry;
+          const polys = g.type === "Polygon" ? [g.coordinates] :
+            g.type === "MultiPolygon" ? g.coordinates : [];
+
+          polys.forEach((poly) => {
+            const rings = poly
+              .filter((ring) => ring && ring.length >= 3)
+              .map((ring) => ring.map((pt) => ({ lon: pt[0], lat: pt[1] })));
+
+            if (!rings.length) return;
+
+            rings.forEach((ring) => {
+              ring.forEach((pt) => {
+                if (pt.lon < bounds.minLon) bounds.minLon = pt.lon;
+                if (pt.lon > bounds.maxLon) bounds.maxLon = pt.lon;
+                if (pt.lat < bounds.minLat) bounds.minLat = pt.lat;
+                if (pt.lat > bounds.maxLat) bounds.maxLat = pt.lat;
+              });
+            });
+
+            rawPolys.push({ rings });
+          });
+        });
+      }
+
+      geoBounds = bounds;
+      provinceLabels = labels.map((d) => {
+        const p = llToNorm(d.lon, d.lat);
+        return { name: d.name, x: p.x, y: p.y };
+      });
+
+      geoPolygons = rawPolys.map((poly) => {
+        const outer = poly.rings[0].map((pt) => llToNorm(pt.lon, pt.lat));
+        const holes = poly.rings.slice(1).map((ring) => ring.map((pt) => llToNorm(pt.lon, pt.lat)));
+        return { outer, holes };
+      });
+
+      normalizeGeoModels();
+      geoReady = true;
+    }
+
+    function setFallbackGeo() {
+      geoBounds = { minLon: 103, maxLon: 121.8, minLat: 20.1, maxLat: 31.8 };
+      geoPolygons = [{
+        outer: [
+          llToNorm(103.6, 29.8),
+          llToNorm(106.2, 31.4),
+          llToNorm(110.9, 30.8),
+          llToNorm(114.9, 30.9),
+          llToNorm(118.7, 28.9),
+          llToNorm(120.9, 25.8),
+          llToNorm(117.5, 22.1),
+          llToNorm(112.6, 21.6),
+          llToNorm(108.1, 21.2),
+          llToNorm(104.8, 23.1),
+          llToNorm(103.8, 26.1)
+        ],
+        holes: []
+      }];
+
+      const fallbackLabels = [
+        { name: "重庆", lon: 106.55, lat: 29.56 },
+        { name: "湖南", lon: 112.94, lat: 28.22 },
+        { name: "江西", lon: 115.86, lat: 28.68 },
+        { name: "福建", lon: 119.3, lat: 26.07 },
+        { name: "广东", lon: 113.26, lat: 23.13 },
+        { name: "广西", lon: 108.32, lat: 22.82 },
+        { name: "贵州", lon: 106.63, lat: 26.65 },
+        { name: "湖北", lon: 114.3, lat: 30.59 }
+      ];
+      provinceLabels = fallbackLabels.map((d) => {
+        const p = llToNorm(d.lon, d.lat);
+        return { name: d.name, x: p.x, y: p.y };
+      });
+
+      normalizeGeoModels();
+      geoReady = true;
+    }
+
+    function nearestRefuge(x, y) {
+      if (!REFUGES.length) return { x: 0.55, y: 0.58, w: 1 };
+      let best = REFUGES[0];
+      let bestD = Infinity;
+      for (let i = 0; i < REFUGES.length; i += 1) {
+        const r = REFUGES[i];
+        const d = dist2(x, y, r.x, r.y) / (r.w * 0.7 + 0.3);
+        if (d < bestD) {
+          bestD = d;
+          best = r;
+        }
+      }
+      return best;
+    }
+
+    function corridorTarget(x, y) {
+      if (!CORRIDORS.length) return { x, y };
+      let best = null;
+      let bestD = Infinity;
+      for (let i = 0; i < CORRIDORS.length; i += 1) {
+        const c = CORRIDORS[i];
+        for (let j = 0; j < c.length; j += 1) {
+          const p = c[j];
+          const d = dist2(x, y, p.x, p.y);
+          if (d < bestD) {
+            bestD = d;
+            best = c[Math.min(c.length - 1, j + 1)];
+          }
+        }
+      }
+      return best || { x, y };
+    }
+
+    function pressureAt(x, y) {
+      const stageFactor = currentStage.pressure * SETTINGS.pressure;
+      let p = 0;
+
+      for (let i = 0; i < CITY_HOTSPOTS.length; i += 1) {
+        const h = CITY_HOTSPOTS[i];
+        const d = Math.hypot(x - h.x, y - h.y);
+        p += h.w * Math.exp(-(d * d) / (2 * h.r * h.r));
+      }
+
+      for (let i = 0; i < ROAD_SEGMENTS.length; i += 1) {
+        const r = ROAD_SEGMENTS[i];
+        const d = distPointToSeg(x, y, r.a.x, r.a.y, r.b.x, r.b.y);
+        p += r.w * Math.exp(-(d * d) / (2 * r.r * r.r));
+      }
+
+      if (!inHabitat(x, y)) p += 2.2;
+      return p * stageFactor;
+    }
+
+    function pressureGradient(x, y) {
+      const e = 0.004;
+      const gx = pressureAt(x + e, y) - pressureAt(x - e, y);
+      const gy = pressureAt(x, y + e) - pressureAt(x, y - e);
+      return { x: gx / (2 * e), y: gy / (2 * e) };
+    }
+
+    function spawnPoint(preferRefuge) {
+      for (let i = 0; i < 120; i += 1) {
+        let x;
+        let y;
+        if (preferRefuge) {
+          const r = REFUGES[Math.floor(Math.random() * REFUGES.length)];
+          x = r.x + rand(-0.06, 0.06);
+          y = r.y + rand(-0.06, 0.06);
+        } else {
+          x = rand(0.05, 0.95);
+          y = rand(0.05, 0.95);
+        }
+
+        if (!inHabitat(x, y)) continue;
+        if (pressureAt(x, y) > 1.55) continue;
+        return { x, y };
+      }
+      return { x: 0.56, y: 0.58 };
+    }
+
+    function createParticle(seedToRefuge = false) {
+      const s = spawnPoint(seedToRefuge);
+      return {
+        x: s.x,
+        y: s.y,
+        vx: rand(-0.012, 0.012),
+        vy: rand(-0.012, 0.012),
+        age: rand(0, 1000),
+        energy: rand(0.65, 1),
+        homeX: s.x + rand(-0.03, 0.03),
+        homeY: s.y + rand(-0.03, 0.03),
+        stride: rand(0.7, 1.3),
+        phase: rand(0, Math.PI * 2),
+        alive: true
+      };
+    }
+
+    function setStage(idx) {
+      stageIndex = clamp(idx, 0, STAGES.length - 1);
+      currentStage = STAGES[stageIndex];
+      targetCount = currentStage.targetParticles;
+
+      renderStory();
+      updateStageButtons();
+    }
+
+    function renderStory() {
+      stageTitleEl.textContent = currentStage.title;
+      stageDescEl.textContent = currentStage.desc;
+
+      const currentPopulation = Math.round((particles.length / STAGES[0].targetParticles) * 4000);
+      statsEl.innerHTML = [
+        `<div class="kv"><span class="k">阶段时段</span><span class="v">${currentStage.period}</span></div>`,
+        `<div class="kv"><span class="k">历史信息</span><span class="v">${currentStage.historicalPeak}</span></div>`,
+        `<div class="kv"><span class="k">当前粒子数</span><span class="v">${particles.length}</span></div>`,
+        `<div class="kv"><span class="k">折算种群估计</span><span class="v">约 ${Math.max(0, currentPopulation)} 只</span></div>`
+      ].join("");
+
+      valueEls.model.textContent = controls.model.selectedOptions[0].textContent;
+      valueEls.speed.textContent = Number(SETTINGS.speed).toFixed(2);
+      valueEls.noise.textContent = Number(SETTINGS.noise).toFixed(2);
+      valueEls.cohesion.textContent = Number(SETTINGS.cohesion).toFixed(2);
+      valueEls.separation.textContent = Number(SETTINGS.separation).toFixed(2);
+      valueEls.pressure.textContent = Number(SETTINGS.pressure).toFixed(2);
+      valueEls.migrate.textContent = Number(SETTINGS.migrate).toFixed(2);
+    }
+
+    function updateStageButtons() {
+      const btns = stageButtonsEl.querySelectorAll("button");
+      btns.forEach((b, i) => b.classList.toggle("active", i === stageIndex));
+      controls.auto.textContent = `自动演进：${SETTINGS.auto ? "开" : "关"}`;
+      controls.ghost.textContent = `灭绝痕迹：${SETTINGS.ghost ? "开" : "关"}`;
+    }
+
+    function rebuildMap() {
+      mapCanvas.width = Math.floor(W * DPR);
+      mapCanvas.height = Math.floor(H * DPR);
+      mapCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+      mapCtx.clearRect(0, 0, W, H);
+      mapCtx.fillStyle = "#0d131c";
+      mapCtx.fillRect(0, 0, W, H);
+
+      for (let y = 0; y < H; y += 4) {
+        for (let x = 0; x < W; x += 4) {
+          const nx = x / W;
+          const ny = y / H;
+          if (!inHabitat(nx, ny)) continue;
+          const s = terrainShade(nx, ny);
+          const v = Math.floor(mix(28, 62, s));
+          mapCtx.fillStyle = `rgba(${v}, ${v + 5}, ${v + 8}, 0.45)`;
+          mapCtx.fillRect(x, y, 4, 4);
+        }
+      }
+
+      mapCtx.strokeStyle = "rgba(130, 144, 160, 0.55)";
+      mapCtx.lineWidth = 1.25;
+      geoPolygons.forEach((poly) => {
+        mapCtx.beginPath();
+        poly.outer.forEach((p, i) => {
+          if (i === 0) mapCtx.moveTo(p.x * W, p.y * H);
+          else mapCtx.lineTo(p.x * W, p.y * H);
+        });
+        mapCtx.closePath();
+        mapCtx.stroke();
+      });
+
+      mapCtx.strokeStyle = "rgba(136, 157, 182, 0.35)";
+      mapCtx.lineWidth = 1;
+      ROAD_SEGMENTS.forEach((r) => {
+        mapCtx.beginPath();
+        mapCtx.moveTo(r.a.x * W, r.a.y * H);
+        mapCtx.lineTo(r.b.x * W, r.b.y * H);
+        mapCtx.stroke();
+      });
+
+      mapCtx.fillStyle = "rgba(175, 189, 206, 0.75)";
+      mapCtx.font = "12px PingFang SC, Microsoft YaHei, sans-serif";
+      mapCtx.textAlign = "center";
+      mapCtx.textBaseline = "middle";
+      provinceLabels.forEach((p) => {
+        mapCtx.fillText(p.name, p.x * W, p.y * H);
+      });
+    }
+
+    function resize() {
+      DPR = Math.max(1, window.devicePixelRatio || 1);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = `${W}px`;
+      canvas.style.height = `${H}px`;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      rebuildMap();
+    }
+
+    function reseed() {
+      particles = [];
+      extinctionMarks = [];
+      for (let i = 0; i < targetCount; i += 1) {
+        particles.push(createParticle(stageIndex >= 2));
+      }
+      renderStory();
+    }
+
+    function regulatePopulation(dt) {
+      const addRate = stageIndex === 0 ? 2.4 : stageIndex === 1 ? 1.2 : 0.45;
+      const removeRate = stageIndex === 0 ? 0.5 : stageIndex === 1 ? 1.7 : 2.8;
+
+      if (particles.length < targetCount) {
+        const n = Math.min(targetCount - particles.length, Math.ceil(addRate * dt * 60));
+        for (let i = 0; i < n; i += 1) {
+          particles.push(createParticle(stageIndex >= 2));
+        }
+      } else if (particles.length > targetCount) {
+        const n = Math.min(particles.length - targetCount, Math.ceil(removeRate * dt * 60));
+        for (let i = 0; i < n; i += 1) {
+          const k = Math.floor(Math.random() * particles.length);
+          const p = particles[k];
+          extinctionMarks.push({ x: p.x, y: p.y, life: 1 });
+          particles.splice(k, 1);
+        }
+      }
+    }
+
+    function sampleNeighbors(p, count = 18) {
+      const out = [];
+      if (particles.length <= 1) return out;
+      for (let i = 0; i < count; i += 1) {
+        const q = particles[(Math.random() * particles.length) | 0];
+        if (q === p) continue;
+        const d2v = dist2(p.x, p.y, q.x, q.y);
+        if (d2v < 0.014) out.push({ q, d2: d2v });
+      }
+      return out;
+    }
+
+    function updateParticleAdaptive(p, dt) {
+      const ns = sampleNeighbors(p, 20);
+      let cohX = 0;
+      let cohY = 0;
+      let sepX = 0;
+      let sepY = 0;
+      let nC = 0;
+
+      for (let i = 0; i < ns.length; i += 1) {
+        const item = ns[i];
+        const q = item.q;
+        const d = Math.sqrt(item.d2) + 1e-5;
+
+        cohX += q.x;
+        cohY += q.y;
+        nC += 1;
+
+        if (d < 0.04) {
+          sepX += (p.x - q.x) / d;
+          sepY += (p.y - q.y) / d;
+        }
+      }
+
+      if (nC > 0) {
+        cohX = cohX / nC - p.x;
+        cohY = cohY / nC - p.y;
+      }
+
+      const g = pressureGradient(p.x, p.y);
+      const fleeX = -g.x;
+      const fleeY = -g.y;
+
+      const r = nearestRefuge(p.x, p.y);
+      const migX = r.x - p.x;
+      const migY = r.y - p.y;
+
+      const wanderX = Math.cos(p.phase + p.age * 0.03) * SETTINGS.noise;
+      const wanderY = Math.sin(p.phase * 0.8 + p.age * 0.022) * SETTINGS.noise;
+
+      const ax =
+        cohX * 0.5 * SETTINGS.cohesion +
+        sepX * 0.9 * SETTINGS.separation +
+        fleeX * 0.55 +
+        migX * currentStage.pressure * SETTINGS.migrate * 0.72 +
+        wanderX * 0.26;
+
+      const ay =
+        cohY * 0.5 * SETTINGS.cohesion +
+        sepY * 0.9 * SETTINGS.separation +
+        fleeY * 0.55 +
+        migY * currentStage.pressure * SETTINGS.migrate * 0.72 +
+        wanderY * 0.26;
+
+      p.vx += ax * dt;
+      p.vy += ay * dt;
+    }
+
+    function updateParticleTerritorial(p, dt) {
+      const homePullX = (p.homeX - p.x) * 0.7;
+      const homePullY = (p.homeY - p.y) * 0.7;
+
+      const ns = sampleNeighbors(p, 12);
+      let sepX = 0;
+      let sepY = 0;
+      for (let i = 0; i < ns.length; i += 1) {
+        const q = ns[i].q;
+        const dx = p.x - q.x;
+        const dy = p.y - q.y;
+        const d = Math.hypot(dx, dy) + 1e-4;
+        if (d < 0.035) {
+          sepX += dx / d;
+          sepY += dy / d;
+        }
+      }
+
+      const g = pressureGradient(p.x, p.y);
+      const fleeX = -g.x;
+      const fleeY = -g.y;
+
+      const wX = Math.cos(p.phase + p.age * 0.04) * SETTINGS.noise;
+      const wY = Math.sin(p.phase * 1.1 + p.age * 0.03) * SETTINGS.noise;
+
+      if (pressureAt(p.x, p.y) > 0.95) {
+        const rf = nearestRefuge(p.x, p.y);
+        p.homeX = mix(p.homeX, rf.x, 0.08 * SETTINGS.migrate);
+        p.homeY = mix(p.homeY, rf.y, 0.08 * SETTINGS.migrate);
+      }
+
+      p.vx += (homePullX * 0.45 + sepX * SETTINGS.separation + fleeX * 0.7 + wX * 0.3) * dt;
+      p.vy += (homePullY * 0.45 + sepY * SETTINGS.separation + fleeY * 0.7 + wY * 0.3) * dt;
+    }
+
+    function updateParticleCorridor(p, dt) {
+      const c = corridorTarget(p.x, p.y);
+      const cx = c.x - p.x;
+      const cy = c.y - p.y;
+
+      const ns = sampleNeighbors(p, 16);
+      let cohX = 0;
+      let cohY = 0;
+      let n = 0;
+      for (let i = 0; i < ns.length; i += 1) {
+        cohX += ns[i].q.x;
+        cohY += ns[i].q.y;
+        n += 1;
+      }
+      if (n > 0) {
+        cohX = cohX / n - p.x;
+        cohY = cohY / n - p.y;
+      }
+
+      const g = pressureGradient(p.x, p.y);
+      const fleeX = -g.x;
+      const fleeY = -g.y;
+
+      const wX = Math.cos(p.phase * 0.6 + p.age * 0.03) * SETTINGS.noise;
+      const wY = Math.sin(p.phase * 0.7 + p.age * 0.025) * SETTINGS.noise;
+
+      p.vx += (cx * 0.95 * SETTINGS.migrate + cohX * 0.25 * SETTINGS.cohesion + fleeX * 0.62 + wX * 0.2) * dt;
+      p.vy += (cy * 0.95 * SETTINGS.migrate + cohY * 0.25 * SETTINGS.cohesion + fleeY * 0.62 + wY * 0.2) * dt;
+    }
+
+    function moveParticle(p, dt) {
+      if (SETTINGS.model === "adaptive") updateParticleAdaptive(p, dt);
+      else if (SETTINGS.model === "territorial") updateParticleTerritorial(p, dt);
+      else updateParticleCorridor(p, dt);
+
+      const drag = 0.972;
+      p.vx *= drag;
+      p.vy *= drag;
+
+      const speedLimit = 0.24 * SETTINGS.speed * p.stride;
+      const vLen = len(p.vx, p.vy);
+      if (vLen > speedLimit) {
+        p.vx = (p.vx / vLen) * speedLimit;
+        p.vy = (p.vy / vLen) * speedLimit;
+      }
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.age += dt * 60;
+
+      if (!inHabitat(p.x, p.y)) {
+        const rf = nearestRefuge(p.x, p.y);
+        p.x = mix(p.x, rf.x, 0.12);
+        p.y = mix(p.y, rf.y, 0.12);
+        p.vx *= 0.5;
+        p.vy *= 0.5;
+      }
+
+      const pr = pressureAt(p.x, p.y);
+      const risk = clamp(pr - (0.45 - stageIndex * 0.08), 0, 2.4);
+      if (Math.random() < currentStage.collapseRisk * risk * (0.85 + 0.3 * SETTINGS.pressure)) {
+        p.alive = false;
+      }
+
+      if (stageIndex >= 1 && pr > 0.85 && Math.random() < 0.03) {
+        const rf = nearestRefuge(p.x, p.y);
+        p.vx += (rf.x - p.x) * 0.008 * SETTINGS.migrate;
+        p.vy += (rf.y - p.y) * 0.008 * SETTINGS.migrate;
+      }
+    }
+
+    function update(dt) {
+      if (SETTINGS.auto) {
+        autoClock += dt;
+        if (autoClock > 10.5) {
+          autoClock = 0;
+          setStage((stageIndex + 1) % STAGES.length);
+        }
+      }
+
+      regulatePopulation(dt);
+
+      for (let i = particles.length - 1; i >= 0; i -= 1) {
+        const p = particles[i];
+        moveParticle(p, dt);
+        if (!p.alive) {
+          extinctionMarks.push({ x: p.x, y: p.y, life: 1 });
+          particles.splice(i, 1);
+        }
+      }
+
+      for (let i = extinctionMarks.length - 1; i >= 0; i -= 1) {
+        extinctionMarks[i].life -= dt * 0.14;
+        if (extinctionMarks[i].life <= 0) extinctionMarks.splice(i, 1);
+      }
+    }
+
+    function drawPressureField() {
+      const amp = currentStage.pressure * SETTINGS.pressure;
+      if (amp < 0.08) return;
+
+      for (let i = 0; i < CITY_HOTSPOTS.length; i += 1) {
+        const h = CITY_HOTSPOTS[i];
+        const r = h.r * W * (0.75 + amp * 0.5);
+        const grd = ctx.createRadialGradient(h.x * W, h.y * H, 0, h.x * W, h.y * H, r);
+        grd.addColorStop(0, `rgba(201, 90, 79, ${0.15 * amp})`);
+        grd.addColorStop(1, "rgba(201, 90, 79, 0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(h.x * W, h.y * H, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawTextImpactLayer(now) {
+      const stageT = stageIndex / 2;
+      const cell = 16;
+      const twinkle = now * 0.0008;
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "11px STHeiti, PingFang SC, Microsoft YaHei, sans-serif";
+
+      for (let y = 0; y < H; y += cell) {
+        for (let x = 0; x < W; x += cell) {
+          const nx = (x + cell * 0.5) / W;
+          const ny = (y + cell * 0.5) / H;
+          if (!pointInRegion(nx, ny)) continue;
+
+          const p = pressureAt(nx, ny);
+          const t = terrainShade(nx, ny);
+          const k = 0.5 + 0.5 * Math.sin(nx * 42 + ny * 29 + twinkle);
+
+          let glyph = "";
+          let alpha = 0;
+          let color = "rgba(190, 203, 182, 0.2)";
+
+          const humanFactor = clamp(p * 1.35 + stageT * 0.55, 0, 1.2);
+          const natureFactor = clamp((t * 0.85) * (1.12 - humanFactor), 0, 1);
+
+          if (humanFactor > 0.62 && Math.random() < 0.56 + humanFactor * 0.18) {
+            glyph = HUMAN_TEXT[(Math.floor(nx * 40 + ny * 31 + now * 0.002) % HUMAN_TEXT.length + HUMAN_TEXT.length) % HUMAN_TEXT.length];
+            alpha = clamp(0.12 + humanFactor * 0.35 + k * 0.08, 0.08, 0.58);
+            color = stageIndex >= 2 ? "rgba(245, 162, 110, 0.52)" : "rgba(233, 206, 156, 0.45)";
+          } else if (natureFactor > 0.24 && Math.random() < 0.4 + natureFactor * 0.35) {
+            glyph = NATURE_TEXT[(Math.floor(nx * 53 + ny * 47 + now * 0.001) % NATURE_TEXT.length + NATURE_TEXT.length) % NATURE_TEXT.length];
+            alpha = clamp(0.08 + natureFactor * 0.28 + k * 0.06, 0.05, 0.4);
+            color = "rgba(164, 191, 167, 0.38)";
+          }
+
+          if (!glyph) continue;
+          const rgba = color.replace(/[\d.]+\)$/, `${alpha})`);
+          ctx.fillStyle = rgba;
+          ctx.fillText(glyph, x + cell * 0.5, y + cell * 0.5);
+        }
+      }
+    }
+
+    function drawParticles() {
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        const x = p.x * W;
+        const y = p.y * H;
+        const sp = len(p.vx, p.vy);
+
+        const radius = 1.6 + p.energy * 1.9;
+        const glow = 5 + sp * 12;
+
+        const g = ctx.createRadialGradient(x, y, 0, x, y, glow);
+        g.addColorStop(0, "rgba(244, 165, 74, 0.95)");
+        g.addColorStop(0.5, "rgba(238, 133, 52, 0.48)");
+        g.addColorStop(1, "rgba(238, 133, 52, 0)");
+
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, glow, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255, 186, 97, 0.95)";
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawExtinctionMarks() {
+      if (!SETTINGS.ghost) return;
+      for (let i = 0; i < extinctionMarks.length; i += 1) {
+        const m = extinctionMarks[i];
+        const x = m.x * W;
+        const y = m.y * H;
+        const a = m.life * (stageIndex >= 2 ? 0.7 : 0.46);
+        ctx.strokeStyle = `rgba(245, 198, 158, ${a})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y - 4);
+        ctx.lineTo(x + 4, y + 4);
+        ctx.moveTo(x + 4, y - 4);
+        ctx.lineTo(x - 4, y + 4);
+        ctx.stroke();
+      }
+    }
+
+    function render(now) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(mapCanvas, 0, 0, W, H);
+      drawPressureField();
+      drawTextImpactLayer(now);
+      drawParticles();
+      drawExtinctionMarks();
+    }
+
+    function tick(now) {
+      const dt = clamp((now - tPrev) / 1000, 0.001, 0.05);
+      tPrev = now;
+      update(dt);
+      render(now);
+      renderStory();
+      requestAnimationFrame(tick);
+    }
+
+    function bindControls() {
+      const sliders = ["speed", "noise", "cohesion", "separation", "pressure", "migrate"];
+      sliders.forEach((key) => {
+        controls[key].addEventListener("input", () => {
+          SETTINGS[key] = parseFloat(controls[key].value);
+          renderStory();
+        });
+      });
+
+      controls.model.addEventListener("change", () => {
+        SETTINGS.model = controls.model.value;
+        renderStory();
+      });
+
+      controls.auto.addEventListener("click", () => {
+        SETTINGS.auto = !SETTINGS.auto;
+        updateStageButtons();
+      });
+
+      controls.ghost.addEventListener("click", () => {
+        SETTINGS.ghost = !SETTINGS.ghost;
+        updateStageButtons();
+      });
+
+      controls.reseeding.addEventListener("click", reseed);
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "1") setStage(0);
+        else if (e.key === "2") setStage(1);
+        else if (e.key === "3") setStage(2);
+        else if (e.key.toLowerCase() === "a") {
+          SETTINGS.auto = !SETTINGS.auto;
+          updateStageButtons();
+        } else if (e.key.toLowerCase() === "g") {
+          SETTINGS.ghost = !SETTINGS.ghost;
+          updateStageButtons();
+        } else if (e.key.toLowerCase() === "r") {
+          reseed();
+        } else if (e.key.toLowerCase() === "m") {
+          const seq = ["adaptive", "territorial", "corridor"];
+          const i = seq.indexOf(SETTINGS.model);
+          SETTINGS.model = seq[(i + 1) % seq.length];
+          controls.model.value = SETTINGS.model;
+          renderStory();
+        }
+      });
+
+      window.addEventListener("resize", resize);
+    }
+
+    function initStageButtons() {
+      stageButtonsEl.innerHTML = "";
+      STAGES.forEach((s, i) => {
+        const b = document.createElement("button");
+        b.textContent = `阶段 ${s.id}`;
+        b.addEventListener("click", () => setStage(i));
+        stageButtonsEl.appendChild(b);
+      });
+      updateStageButtons();
+    }
+
+    async function init() {
+      initStageButtons();
+      bindControls();
+      resize();
+      try {
+        await loadSouthChinaGeoData();
+      } catch (err) {
+        console.error(err);
+        setFallbackGeo();
+      }
+      rebuildMap();
+      setStage(0);
+      reseed();
+      if (loadingEl) loadingEl.style.display = "none";
+      requestAnimationFrame(tick);
+    }
+
+    init();
+  </script>
+</body>
+</html>

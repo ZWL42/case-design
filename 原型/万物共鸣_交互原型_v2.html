@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>万物共鸣 v2 · 文字侵占与濒危生态交互体验</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:#05050a;color:#fff;font-family:'PingFang SC','Microsoft YaHei',sans-serif;overflow-x:hidden}
+#cvs{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+#story{position:relative;z-index:1}
+.sec{min-height:100vh;display:flex;align-items:center;padding:0 7vw}
+.sec.col{flex-direction:column;justify-content:center;text-align:center}
+.sec.right{justify-content:flex-end}
+.sec.center{justify-content:center}
+.card{max-width:420px;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);border-left:1px solid rgba(255,255,255,.1);padding:36px 32px}
+.card h2{font-family:'STSong','SimSun',serif;font-size:clamp(18px,2.4vw,28px);font-weight:300;letter-spacing:.25em;color:#fff;margin-bottom:18px}
+.card p{font-size:clamp(12px,1.4vw,14px);line-height:2;color:rgba(255,255,255,.6);margin-bottom:10px}
+.card em{color:rgba(255,160,100,.8);font-style:normal}
+.card .src{margin-top:18px;font-size:10px;color:rgba(255,255,255,.25);line-height:1.8}
+#s0{min-height:100vh;pointer-events:all}
+#s0 h1{font-family:'STSong','SimSun',serif;font-size:clamp(40px,9vw,110px);font-weight:200;letter-spacing:.55em;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:22px}
+#s0 .sub{font-size:clamp(11px,1.4vw,14px);letter-spacing:.3em;color:rgba(255,255,255,.28);margin-bottom:6px}
+.arrow{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.18);font-size:11px;letter-spacing:.2em;animation:blink 2.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.18}50%{opacity:.55}}
+.extinct-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:820px;width:100%;pointer-events:none}
+.ext-card{border:1px solid rgba(255,255,255,.07);padding:28px 22px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);position:relative;overflow:hidden}
+.ext-card .ch{font-family:'STSong','SimSun',serif;font-size:30px;font-weight:300;color:rgba(255,255,255,.22);margin-bottom:6px}
+.ext-card .en{font-size:10px;color:rgba(255,255,255,.15);margin-bottom:10px;letter-spacing:.05em}
+.ext-card .yr{font-size:22px;color:rgba(220,80,80,.5);margin-bottom:14px}
+.ext-card .info{font-size:11px;color:rgba(255,255,255,.22);line-height:1.9}
+.ext-card .note{margin-top:12px;font-size:10px;font-style:italic;color:rgba(220,80,80,.4);line-height:1.8}
+.sp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;max-width:860px;width:100%;pointer-events:none}
+.sp-card{border:1px solid rgba(255,255,255,.06);padding:22px 18px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);position:relative;overflow:hidden}
+.sp-card .ch{font-family:'STSong','SimSun',serif;font-size:22px;font-weight:300;margin-bottom:6px}
+.sp-card .st{font-size:10px;margin-bottom:10px;letter-spacing:.05em}
+.sp-card .dt{font-size:11px;color:rgba(255,255,255,.38);line-height:1.9}
+.sp-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center 25%;opacity:.14;filter:grayscale(1) contrast(1.1);pointer-events:none}
+.sp-card>*:not(.sp-bg){position:relative;z-index:1}
+.hope-inner{max-width:540px;text-align:center;pointer-events:none;border-top:1px solid rgba(255,195,210,.18);padding-top:40px}
+.hope-inner .num{font-family:'STSong','SimSun',serif;font-size:clamp(40px,7vw,80px);font-weight:200;color:rgba(255,195,210,.7);letter-spacing:.1em;margin-bottom:10px}
+.hope-inner h3{font-family:'STSong','SimSun',serif;font-size:clamp(16px,2vw,22px);font-weight:300;letter-spacing:.3em;margin-bottom:20px}
+.hope-inner p{font-size:13px;line-height:2.2;color:rgba(255,255,255,.55);margin-bottom:10px}
+#s6{pointer-events:all;cursor:default}
+#s6 .q{font-family:'STSong','SimSun',serif;font-size:clamp(16px,2.5vw,26px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.6);margin-bottom:18px}
+#s6 .tagline{font-size:13px;color:rgba(255,255,255,.25);letter-spacing:.2em}
+#bar{position:fixed;top:0;left:0;height:1px;background:rgba(255,255,255,.25);z-index:100;transition:width .1s}
+#mic{position:fixed;bottom:28px;right:28px;z-index:50;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.65);backdrop-filter:blur(4px);padding:14px 18px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.45);letter-spacing:.1em;transition:all .3s;pointer-events:all}
+#mic:hover{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.9)}
+#mic .ms{margin-top:5px;font-size:9px;color:rgba(255,255,255,.25)}
+#sound-toggle{position:fixed;bottom:28px;left:28px;z-index:50;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.6);padding:12px 16px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.35);pointer-events:all;transition:all .3s}
+#sound-toggle:hover{color:rgba(255,255,255,.8)}
+#restrain-count{position:fixed;bottom:80px;left:28px;z-index:50;font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.1em;pointer-events:none}
+.ext-svg{display:block;width:100%;height:66px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<canvas id="cvs"></canvas>
+<audio id="aud-baiji" src="声音/白鳍豚.mp3" loop preload="none"></audio>
+<audio id="aud-ibis" src="声音/朱鹮.mp3" loop preload="none"></audio>
+<audio id="aud-city" src="声音/freesound_community-city-noise-30537.mp3" loop preload="none"></audio>
+<audio id="aud-citybird" src="声音/baranova_n-city-birds-444667.mp3" loop preload="none"></audio>
+<div id="mic" onclick="reqMic()">🎙 连接麦克风<div class="ms" id="ms">点击感知环境声音</div></div>
+<div id="sound-toggle" onclick="toggleSound()">♪ 声音：关</div>
+<div id="restrain-count"></div>
+
+<div id="story">
+
+<section id="s0" class="sec col" data-s="intro" style="position:relative">
+  <h1>万物共鸣</h1>
+  <p class="sub">中国濒危物种 · 视听觉交互体验设计</p>
+  <p style="font-size:10px;color:rgba(255,255,255,.15);letter-spacing:.2em">周小钧 · 广东白云学院 · 22数字媒体艺术1班</p>
+  <div class="arrow">↓ &nbsp;向下滚动 &nbsp;↓</div>
+</section>
+
+<section id="s1" class="sec" data-s="resonance" style="min-height:150vh;align-items:flex-start;padding-top:25vh">
+  <div class="card"><h2>亿万年的共鸣</h2>
+  <p>地球的声景从不属于任何单一的物种。鸟鸣、兽啸、水声、虫鸣——每一种生命都在发出自己的频率。</p>
+  <p>整个系统维持着周期性的稳定，<em>从未有哪一种声音彻底消失</em>。</p>
+  <p>背景中隐约浮现的文字，是人类最早的痕迹——稀疏、安静，与万物共处。</p>
+  <div class="src">数据来源：IUCN 全球物种红色名录 · 中国生物多样性监测与研究网络</div></div>
+</section>
+
+<section id="s2" class="sec right" data-s="disturb" style="min-height:150vh;align-items:flex-start;padding-top:22vh">
+  <div class="card"><h2>文字开始扩张</h2>
+  <p>工业革命之后，技术使生产规模突破了自然的缓冲边界。</p>
+  <p>观察背景——城市字符在密集生长，道路在铺设。文字所到之处，<em>生物让位</em>。</p>
+  <p>1900年至今，地球物种灭绝速度是自然灭绝速率的 <em>1000 倍</em>以上。</p>
+  <div class="src">来源：江建平等.中国两栖动物受威胁现状评估.生物多样性,2016</div></div>
+</section>
+
+<section id="s3" class="sec col" data-s="extinct" style="min-height:190vh;justify-content:flex-start;padding-top:14vh;gap:50px">
+  <div style="text-align:center;max-width:600px;pointer-events:none">
+    <h2 style="font-family:'STSong',serif;font-size:clamp(18px,2.5vw,28px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.65);margin-bottom:14px">他们已经离开了</h2>
+    <p style="font-size:12px;color:rgba(255,255,255,.3);line-height:2;letter-spacing:.06em">以下三种动物在中国境内已宣告灭绝或功能性灭绝</p>
+  </div>
+  <div class="extinct-wrap">
+    <div class="ext-card">
+      <svg class="ext-svg" viewBox="0 0 160 66" xmlns="http://www.w3.org/2000/svg" fill="rgba(140,170,210,0.35)"><path d="M32,33 C46,18 72,19 98,22 C118,24 136,28 144,33 C136,38 118,42 98,44 C72,47 46,48 32,33 Z"/><path d="M2,30 L32,29 L32,37 L2,36 Z"/><path d="M90,22 L97,11 L105,22 Z"/><path d="M142,32 L154,22 L152,33 L154,44 L142,34 Z"/></svg>
+      <div class="ch">白鳍豚</div><div class="en">Baiji · Lipotes vexillifer</div><div class="yr">2006</div>
+      <div class="info">功能性灭绝 · 曾栖居长江全流域 · 2500万年</div>
+    </div>
+    <div class="ext-card">
+      <svg class="ext-svg" viewBox="0 0 140 100" xmlns="http://www.w3.org/2000/svg" fill="rgba(150,195,155,0.35)"><ellipse cx="70" cy="62" rx="52" ry="33"/><ellipse cx="70" cy="24" rx="14" ry="11"/><ellipse cx="70" cy="15" rx="8" ry="5"/></svg>
+      <div class="ch">斑鳖</div><div class="en">Rafetus swinhoei</div><div class="yr">2019</div>
+      <div class="info">中国最后个体死亡 · 曾为世界最大淡水龟</div>
+    </div>
+    <div class="ext-card">
+      <svg class="ext-svg" viewBox="0 0 180 96" xmlns="http://www.w3.org/2000/svg"><path d="M48,62 C48,42 58,30 76,28 C100,26 138,28 145,36 C150,44 148,62 140,68 L50,68 Z" fill="rgba(195,165,125,0.38)"/><ellipse cx="38" cy="44" rx="26" ry="20" fill="rgba(195,165,125,0.38)"/></svg>
+      <div class="ch">新疆虎</div><div class="en">Panthera tigris virgata</div><div class="yr">~1970s</div>
+      <div class="info">里海虎中国亚种 · 曾广布塔里木河流域</div>
+    </div>
+  </div>
+</section>
+
+<section id="s4" class="sec col" data-s="endangered" style="min-height:260vh;justify-content:flex-start;padding-top:12vh;gap:40px">
+  <div style="text-align:center;max-width:600px;pointer-events:none">
+    <h2 style="font-family:'STSong',serif;font-size:clamp(17px,2.3vw,26px);font-weight:300;letter-spacing:.3em;color:rgba(255,255,255,.65);margin-bottom:12px">还在呼吸的</h2>
+    <p style="font-size:12px;color:rgba(255,255,255,.28);letter-spacing:.1em;line-height:2.2">粒子是它们的存在 · 文字是逼近的文明<br><em style="color:rgba(255,195,210,.5);font-style:normal">点击画面，遏制扩张</em></p>
+  </div>
+  <div class="sp-grid">
+    <div class="sp-card"><img class="sp-bg" src="图片/雪豹.jpg" alt=""><div class="ch" style="color:rgba(190,220,255,.75)">雪豹</div><div class="st" style="color:rgba(190,220,255,.4)">Snow Leopard · 极危</div><div class="dt">青藏高原 · 全球约4000只</div></div>
+    <div class="sp-card"><img class="sp-bg" src="图片/朱鹮.jpg" alt=""><div class="ch" style="color:rgba(255,195,210,.75)">朱鹮</div><div class="st" style="color:rgba(255,195,210,.4)">Crested Ibis · 濒危</div><div class="dt">陕西洋县 · 1981年仅剩7只</div></div>
+    <div class="sp-card"><img class="sp-bg" src="图片/扬子鳄.jpg" alt=""><div class="ch" style="color:rgba(140,215,170,.75)">扬子鳄</div><div class="st" style="color:rgba(140,215,170,.4)">Chinese Alligator · 极危</div><div class="dt">安徽 · 野外仅约120条</div></div>
+    <div class="sp-card" style="grid-column:1/3"><img class="sp-bg" src="图片/长江江豚.jpg" alt="" style="object-position:center 40%"><div class="ch" style="color:rgba(160,195,255,.75)">长江江豚</div><div class="st" style="color:rgba(160,195,255,.4)">Yangtze Porpoise · 极危</div><div class="dt">长江全流域 · 约1249头</div></div>
+    <div class="sp-card"><img class="sp-bg" src="图片/华南虎.jpg" alt=""><div class="ch" style="color:rgba(255,195,130,.75)">华南虎</div><div class="st" style="color:rgba(255,195,130,.4)">South China Tiger · 野外灭绝</div><div class="dt">华南南岭 · 圈养不足100只</div></div>
+  </div>
+</section>
+
+<section id="s5" class="sec center" data-s="hope" style="min-height:120vh">
+  <div class="hope-inner"><div class="num">7</div><h3>洋县，1981</h3>
+  <p>从 7 只到 2,000 只，中国用了 42 年。</p>
+  <p style="color:rgba(255,195,210,.55)">你的每一次点击，就像那个选择的缩影。</p></div>
+</section>
+
+<section id="s6" class="sec col" data-s="choice" style="min-height:100vh">
+  <p class="q">你想生活在一个什么样的声景里？</p>
+  <p class="tagline">独鸣或易，众方美丽</p>
+  <p style="margin-top:40px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.15em">《万物共鸣》· 周小钧 · 广东白云学院 · 2026</p>
+</section>
+
+</div>
+
+<script>
+// ================================================================
+//  常量与全局状态
+// ================================================================
+const BFS = 18; // 基础网格单元大小(px)
+let STATE = 'intro';
+let civLevel = 0, civSmooth = 0;
+let micLv = 0, micOn = false, sndOn = false, silT = 0;
+let audioCtx, oscillators = [];
+let bgStarted = false;
+
+// 物种 (经纬度 = 真实栖息地)
+const SP = [
+  {name:'雪豹',  col:[190,220,255], lon:95,   lat:35,   gx:0,gy:0,wx:0,wy:0},
+  {name:'朱鹮',  col:[255,195,210], lon:107.5, lat:33.2, gx:0,gy:0,wx:0,wy:0},
+  {name:'扬子鳄',col:[140,215,170], lon:118,  lat:31,   gx:0,gy:0,wx:0,wy:0},
+  {name:'长江江豚',col:[160,195,255],lon:112,  lat:30,   gx:0,gy:0,wx:0,wy:0},
+  {name:'华南虎',col:[255,195,130], lon:113,  lat:25,   gx:0,gy:0,wx:0,wy:0},
+];
+const EX = [
+  {name:'白鳍豚',col:[140,170,210], lon:114,  lat:30.5, gx:0,gy:0,wx:0,wy:0},
+  {name:'斑鳖',  col:[150,195,155], lon:120,  lat:31,   gx:0,gy:0,wx:0,wy:0},
+  {name:'新疆虎',col:[195,165,125], lon:85,   lat:41,   gx:0,gy:0,wx:0,wy:0},
+];
+let vit  = SP.map(()=>1.0);
+let eVit = EX.map(()=>0.0);
+
+// 遏制区
+const restrainZones = []; // {wx, wy, radius, life}
+let restrainCount = 0;
+
+// ================================================================
+//  地理数据 & 预计算网格
+// ================================================================
+let maskData = null, maskW = 2048, maskH = 2048;
+let bounds = {minLon:180,maxLon:-180,minLat:90,maxLat:-90};
+let centerLon = 0, centerLat = 0;
+let degX = 0.15, degY = 0.15; // degY 在 init 后修正
+let geoReady = false;
+
+// 预计算网格 (扁平数组，比字符串key快100倍)
+let GMIN_X = -220, GMAX_X = 220, GMIN_Y = -210, GMAX_Y = 210;
+let GW = 0, GH = 0;
+let landGrid, popGrid; // Uint8Array, Float32Array
+
+const realCities = [
+  {lon:116.40,lat:39.90,w:1.0},{lon:117.20,lat:39.08,w:0.8},
+  {lon:121.47,lat:31.23,w:1.0},{lon:120.15,lat:30.28,w:0.8},
+  {lon:118.79,lat:32.06,w:0.8},{lon:113.26,lat:23.12,w:0.9},
+  {lon:114.05,lat:22.54,w:0.9},{lon:104.06,lat:30.65,w:0.8},
+  {lon:106.50,lat:29.53,w:0.8},{lon:114.30,lat:30.59,w:0.8},
+  {lon:108.94,lat:34.26,w:0.7},{lon:113.62,lat:34.74,w:0.7},
+  {lon:112.93,lat:28.22,w:0.7},{lon:123.42,lat:41.80,w:0.6},
+  {lon:117.00,lat:36.65,w:0.6},{lon:117.22,lat:31.82,w:0.6},
+  {lon:119.30,lat:26.07,w:0.6},{lon:126.63,lat:45.75,w:0.5},
+  {lon:102.71,lat:25.04,w:0.5},{lon:87.61,lat:43.79,w:0.4},
+  {lon:103.83,lat:36.06,w:0.4},{lon:111.67,lat:40.81,w:0.4},
+  {lon:108.32,lat:22.81,w:0.5},{lon:106.71,lat:26.57,w:0.5},
+  {lon:125.32,lat:43.81,w:0.5},{lon:118.08,lat:24.47,w:0.6},
+  {lon:120.38,lat:36.06,w:0.6},{lon:121.61,lat:38.91,w:0.5}
+];
+
+// 字典
+const charsAncient=['人','火','石','木','水','土','山','田','日','月'];
+const charsBorder=['界','疆','防','戍','卫','卡','哨','线'];
+const charsCity=['城','网','市','电','芯','车','楼','算','厂','码'];
+const charsRural=['乡','镇','村','农','田','路','舍','渠','集','桥'];
+const charsWild=['迹','探','测','矿','伐','猎'];
+const charsNature=['林','森','野','山','谷','川','渊','莽'];
+
+// ================================================================
+//  噪声
+// ================================================================
+function _hash(x,y){let h=Math.imul(x,374761393)+Math.imul(y,668265263);h=Math.imul(h^(h>>>13),1274126177);return(h^(h>>>16))>>>0;}
+function rval(x,y){return _hash(x,y)/4294967296.0;}
+function _lerp(a,b,t){return a+t*(b-a);}
+function _ss(t){return t*t*(3-2*t);}
+function vnoise(x,y){let xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=_ss(xf),v=_ss(yf);return _lerp(_lerp(rval(xi,yi),rval(xi+1,yi),u),_lerp(rval(xi,yi+1),rval(xi+1,yi+1),u),v);}
+function fbm(x,y){return vnoise(x,y)+.5*vnoise(x*2,y*2)+.25*vnoise(x*4,y*4);}
+
+// ================================================================
+//  网格坐标 ↔ 地理坐标
+// ================================================================
+function geoToGrid(lon,lat){return{gx:Math.round((lon-centerLon)/degX),gy:Math.round((centerLat-lat)/degY)};}
+function gridIdx(gx,gy){
+  let lx=gx-GMIN_X, ly=gy-GMIN_Y;
+  if(lx<0||lx>=GW||ly<0||ly>=GH) return -1;
+  return ly*GW+lx;
+}
+
+// 查询网格密度 (0~1)，考虑civLevel和遏制区
+function gridDensity(gx, gy) {
+  let idx = gridIdx(gx, gy);
+  if (idx < 0 || !landGrid[idx]) return 0;
+  let pop = popGrid[idx]; // 0~1 基础人口密度
+  let cl = civSmooth;
+  if (cl < 0.01) return 0;
+  // 遏制区减免
+  let wx = gx * BFS, wy = gy * BFS;
+  for (let z of restrainZones) {
+    let dx = wx - z.wx, dy = wy - z.wy;
+    let d = Math.sqrt(dx*dx+dy*dy);
+    if (d < z.radius) cl *= Math.max(0, d / z.radius);
+  }
+  // 映射：civLevel 低时只有高密度区有文字，civLevel 高时到处都有
+  if (cl < 0.2) return pop > 0.6 ? cl * pop * 0.5 : 0;
+  if (cl < 0.7) { let e=(cl-0.2)/0.5; return pop > (0.6-e*0.5) ? e * pop : 0; }
+  let s = (cl-0.7)/0.3;
+  return Math.min(1, pop * (0.5 + s * 0.5) + s * 0.08);
+}
+
+// ================================================================
+//  地理数据加载 + 网格预计算
+// ================================================================
+async function initGeoData() {
+  try {
+    const res = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000.json');
+    const geojson = await res.json();
+    const polygons = [];
+    geojson.features.forEach(feat => {
+      if (!feat.geometry) return;
+      let polys = feat.geometry.type==='Polygon'?[feat.geometry.coordinates[0]]:
+                  feat.geometry.type==='MultiPolygon'?feat.geometry.coordinates.map(c=>c[0]):[];
+      polys.forEach(poly => {
+        polygons.push(poly);
+        poly.forEach(([lon,lat])=>{
+          if(lon<bounds.minLon)bounds.minLon=lon; if(lon>bounds.maxLon)bounds.maxLon=lon;
+          if(lat<bounds.minLat)bounds.minLat=lat; if(lat>bounds.maxLat)bounds.maxLat=lat;
+        });
+      });
+    });
+    centerLon=(bounds.minLon+bounds.maxLon)/2;
+    centerLat=(bounds.minLat+bounds.maxLat)/2;
+    degY = degX * Math.cos(centerLat*Math.PI/180);
+
+    // 生成掩码
+    const mc=document.createElement('canvas'); mc.width=maskW; mc.height=maskH;
+    const mx=mc.getContext('2d');
+    mx.fillStyle='#F00';
+    polygons.forEach(poly=>{mx.beginPath();poly.forEach(([lon,lat],i)=>{let x=(lon-bounds.minLon)/(bounds.maxLon-bounds.minLon)*maskW,y=(bounds.maxLat-lat)/(bounds.maxLat-bounds.minLat)*maskH;i===0?mx.moveTo(x,y):mx.lineTo(x,y);});mx.closePath();mx.fill();});
+    mx.lineWidth=4;mx.strokeStyle='#0F0';
+    polygons.forEach(poly=>{mx.beginPath();poly.forEach(([lon,lat],i)=>{let x=(lon-bounds.minLon)/(bounds.maxLon-bounds.minLon)*maskW,y=(bounds.maxLat-lat)/(bounds.maxLat-bounds.minLat)*maskH;i===0?mx.moveTo(x,y):mx.lineTo(x,y);});mx.closePath();mx.stroke();});
+    maskData=mx.getImageData(0,0,maskW,maskH);
+
+    // 预计算网格
+    GW = GMAX_X - GMIN_X;
+    GH = GMAX_Y - GMIN_Y;
+    landGrid = new Uint8Array(GW * GH);  // 0=海/外, 1=陆地, 2=边界
+    popGrid  = new Float32Array(GW * GH);
+
+    for (let gy = GMIN_Y; gy < GMAX_Y; gy++) {
+      for (let gx = GMIN_X; gx < GMAX_X; gx++) {
+        let lon = centerLon + gx * degX;
+        let lat = centerLat - gy * degY;
+        let idx = (gy - GMIN_Y) * GW + (gx - GMIN_X);
+        if (lon<bounds.minLon||lon>bounds.maxLon||lat<bounds.minLat||lat>bounds.maxLat) continue;
+        let mmx=Math.floor((lon-bounds.minLon)/(bounds.maxLon-bounds.minLon)*maskW);
+        let mmy=Math.floor((bounds.maxLat-lat)/(bounds.maxLat-bounds.minLat)*maskH);
+        mmx=Math.max(0,Math.min(maskW-1,mmx)); mmy=Math.max(0,Math.min(maskH-1,mmy));
+        let mi=(mmy*maskW+mmx)*4;
+        let isLand = maskData.data[mi] > 128;
+        let isBorder = maskData.data[mi+1] > 128;
+        if (!isLand && !isBorder) continue;
+        landGrid[idx] = isBorder ? 2 : 1;
+
+        // 计算基础人口密度
+        let ci = 0;
+        for (let c of realCities) {
+          let dx=(lon-c.lon)*Math.cos(c.lat*Math.PI/180), dy=lat-c.lat;
+          let d=Math.sqrt(dx*dx+dy*dy), r=2.0*c.w;
+          if(d<r) ci+=Math.pow(1-d/r,2)*c.w;
+        }
+        let gw=Math.max(0,Math.min(1,(lon-100)/20));
+        let org=fbm(gx*0.1,gy*0.1)*0.3;
+        if(ci<0.05) org*=gw;
+        popGrid[idx] = Math.min(1.0, ci + org);
+      }
+    }
+
+    // 计算物种世界坐标
+    [...SP,...EX].forEach(sp=>{
+      let g=geoToGrid(sp.lon,sp.lat);
+      sp.gx=g.gx; sp.gy=g.gy;
+      sp.wx=g.gx*BFS; sp.wy=g.gy*BFS;
+    });
+
+    geoReady = true;
+  } catch(e) { console.error('地理数据失败',e); }
+}
+
+// ================================================================
+//  相机系统
+// ================================================================
+let cam = {x:0,y:0,z:1, tx:0,ty:0,tz:1};
+
+function updateCamera(pw, ph) {
+  if (!geoReady) return;
+  // 默认全景: 居中地图
+  let mapW = GW * BFS, mapH = GH * BFS;
+  let fitZoom = Math.min(pw / mapW, ph / mapH) * 0.85;
+
+  if (STATE==='intro'||STATE==='resonance') {
+    cam.tx=0; cam.ty=0; cam.tz=fitZoom;
+  } else if (STATE==='disturb') {
+    cam.tx=0; cam.ty=0; cam.tz=fitZoom*1.1;
+  } else if (STATE==='extinct') {
+    let s3=document.getElementById('s3').getBoundingClientRect();
+    let pr=Math.max(0,Math.min(1,-s3.top/(s3.height-window.innerHeight)));
+    let ei=Math.min(2,Math.floor(pr*3));
+    cam.tx=EX[ei].wx; cam.ty=EX[ei].wy; cam.tz=fitZoom*3;
+  } else if (STATE==='endangered') {
+    let s4=document.getElementById('s4').getBoundingClientRect();
+    let pr=Math.max(0,Math.min(1,-s4.top/(s4.height-window.innerHeight)));
+    let si=Math.min(4,Math.floor(pr*5));
+    cam.tx=SP[si].wx; cam.ty=SP[si].wy; cam.tz=fitZoom*3;
+  } else if (STATE==='hope') {
+    cam.tx=SP[1].wx; cam.ty=SP[1].wy; cam.tz=fitZoom*2.5;
+  } else if (STATE==='choice') {
+    cam.tx=0; cam.ty=0; cam.tz=fitZoom*0.95;
+  }
+  let s=0.03;
+  cam.x+=(cam.tx-cam.x)*s; cam.y+=(cam.ty-cam.y)*s; cam.z+=(cam.tz-cam.z)*s;
+}
+
+// ================================================================
+//  遏制交互
+// ================================================================
+document.addEventListener('click', e => {
+  if (STATE!=='endangered'&&STATE!=='hope'&&STATE!=='choice') return;
+  if (e.target.closest('#mic')||e.target.closest('#sound-toggle')||e.target.closest('.card')) return;
+  // 屏幕点击 → 世界坐标
+  let sx=e.clientX-window.innerWidth/2, sy=e.clientY-window.innerHeight/2;
+  let wx=sx/cam.z+cam.x, wy=sy/cam.z+cam.y;
+  restrainZones.push({wx,wy, radius:BFS*8+Math.random()*BFS*4, life:1.0, decay:0.0004});
+  restrainCount++;
+  document.getElementById('restrain-count').textContent=`遏制 ${restrainCount} 处`;
+});
+
+// ================================================================
+//  滚动
+// ================================================================
+const secs=document.querySelectorAll('[data-s]');
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting&&e.intersectionRatio>.25) STATE=e.target.dataset.s;});},{threshold:[.25]});
+secs.forEach(s=>io.observe(s));
+
+window.addEventListener('scroll',()=>{
+  let p=window.scrollY/(document.body.scrollHeight-window.innerHeight);
+  document.getElementById('bar').style.width=(p*100)+'%';
+  switch(STATE){
+    case 'intro':civLevel=p*1.5;break;
+    case 'resonance':civLevel=0.05+p*0.8;break;
+    case 'disturb':civLevel=0.2+p*1.2;break;
+    case 'extinct':civLevel=0.85;break;
+    case 'endangered':civLevel=0.95;break;
+    case 'hope':civLevel=0.8;break;
+    case 'choice':civLevel=0.65;break;
+  }
+  civLevel=Math.max(0,Math.min(1,civLevel));
+});
+
+// ================================================================
+//  麦克风
+// ================================================================
+async function reqMic(){
+  try{
+    let stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    let ctx=new(window.AudioContext||window.webkitAudioContext)();
+    let src=ctx.createMediaStreamSource(stream),an=ctx.createAnalyser();an.fftSize=256;src.connect(an);
+    let buf=new Uint8Array(an.frequencyBinCount); micOn=true;
+    document.getElementById('ms').textContent='已连接';
+    (function t(){an.getByteFrequencyData(buf);let s=0;for(let v of buf)s+=v;micLv=micLv*.88+(s/buf.length/128)*.12;requestAnimationFrame(t);})();
+  }catch(e){document.getElementById('ms').textContent='无法访问';}
+}
+
+// ================================================================
+//  声音
+// ================================================================
+const FREQ=[280,540,90,520,180];
+const audBaiji=document.getElementById('aud-baiji'),audIbis=document.getElementById('aud-ibis');
+const audCity=document.getElementById('aud-city'),audCityBird=document.getElementById('aud-citybird');
+
+function startBg(){if(bgStarted)return;[audCity,audCityBird].forEach(a=>{a.volume=0;a.play().catch(()=>{});});bgStarted=true;}
+function toggleSound(){
+  sndOn=!sndOn;
+  document.getElementById('sound-toggle').textContent='♪ 声音：'+(sndOn?'开':'关');
+  if(sndOn){startBg();if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});
+    oscillators=SP.map((sp,i)=>{if(i===1)return null;let o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=i===3?'sine':i===2?'sawtooth':'triangle';o.frequency.value=FREQ[i];g.gain.value=0;o.connect(g);g.connect(audioCtx.destination);o.start();return{osc:o,gain:g};});
+  }else{oscillators.forEach(o=>{if(o)try{o.osc.stop();}catch(e){}});oscillators=[];if(audioCtx){audioCtx.close();audioCtx=null;}
+    [audBaiji,audIbis,audCity,audCityBird].forEach(a=>{a.pause();a.currentTime=0;});bgStarted=false;}
+}
+function updateSound(){
+  if(sndOn)startBg();
+  let ct=sndOn?civSmooth*0.25:0; audCity.volume=audCity.volume*.94+ct*.06;
+  let cb=sndOn&&(STATE==='choice'||STATE==='hope')?.18:0; audCityBird.volume=audCityBird.volume*.94+cb*.06;
+  let ba=sndOn&&(STATE==='extinct'||STATE==='endangered'||STATE==='hope');
+  if(ba){if(audBaiji.paused){audBaiji.volume=0;audBaiji.play().catch(()=>{});}audBaiji.volume=Math.min(audBaiji.volume+.003,.28);}
+  else if(!audBaiji.paused){audBaiji.volume=Math.max(audBaiji.volume-.008,0);if(audBaiji.volume<=0)audBaiji.pause();}
+  let ia=sndOn&&(STATE==='endangered'||STATE==='hope'||STATE==='choice');
+  if(ia){if(audIbis.paused){audIbis.volume=0;audIbis.play().catch(()=>{});}audIbis.volume=audIbis.volume*.94+(vit[1]*.42)*.06;}
+  else if(!audIbis.paused){audIbis.volume=Math.max(audIbis.volume-.01,0);if(audIbis.volume<=0)audIbis.pause();}
+  if(!sndOn||!oscillators.length||!audioCtx)return;
+  SP.forEach((sp,i)=>{if(i===1||!oscillators[i])return;let v=vit[i],t=(STATE==='endangered'||STATE==='choice')?v*.06:0;t=Math.min(t,.08);
+    oscillators[i].gain.gain.setTargetAtTime(t,audioCtx.currentTime,.5);
+    let lfo=Math.sin(audioCtx.currentTime*(.22+i*.09)*Math.PI*2);
+    oscillators[i].osc.frequency.setTargetAtTime(FREQ[i]*(.97+v*.06+lfo*.02),audioCtx.currentTime,.35);});
+}
+
+// ================================================================
+//  p5.js — 统一画布：文字 + 粒子
+// ================================================================
+const NP = 100;   // 每物种粒子数
+const NE = 50;    // 灭绝物种幽灵粒子数
+let groups = [], eGroups = [];
+
+new p5(p => {
+
+  function buildParticles() {
+    groups = [];
+    SP.forEach((sp, si) => {
+      let grp = [];
+      let wR = BFS * 10; // 活动半径
+      for (let i = 0; i < NP; i++) {
+        let a = p.random(p.TWO_PI), d = p.random(wR*0.2, wR);
+        grp.push({
+          x: sp.wx + Math.cos(a)*d, y: sp.wy + Math.sin(a)*d,
+          vx: p.random(-.3,.3), vy: p.random(-.3,.3),
+          sz: p.random(2, 4.5), no: p.random(10000),
+          alive: true, opacity: 1, stress: 0
+        });
+      }
+      groups.push(grp);
+    });
+    eGroups = [];
+    EX.forEach((ex, ei) => {
+      let grp = [];
+      for (let i = 0; i < NE; i++) {
+        let a = p.random(p.TWO_PI), d = p.random(BFS*3, BFS*12);
+        grp.push({
+          x: ex.wx + Math.cos(a)*d, y: ex.wy + Math.sin(a)*d,
+          vx: 0, vy: 0, sz: p.random(1, 2.5), no: p.random(10000), phase: p.random(p.TWO_PI)
+        });
+      }
+      eGroups.push(grp);
+    });
+  }
+
+  p.setup = () => {
+    let c = p.createCanvas(p.windowWidth, p.windowHeight);
+    c.elt.id = 'p5c';
+    c.elt.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none;';
+    document.getElementById('cvs').replaceWith(c.elt);
+    p.colorMode(p.RGB, 255); p.noStroke();
+    initGeoData().then(() => { buildParticles(); });
+  };
+
+  p.draw = () => {
+    p.background(5, 5, 10);
+    if (!geoReady) { p.fill(255,255,255,80); p.textAlign(p.CENTER,p.CENTER); p.textSize(14); p.text('正在加载地理数据...',p.width/2,p.height/2); return; }
+
+    civSmooth += (civLevel - civSmooth) * 0.02;
+
+    // 遏制区衰减
+    for (let i = restrainZones.length-1; i >= 0; i--) {
+      restrainZones[i].life -= restrainZones[i].decay;
+      if (restrainZones[i].life <= 0) restrainZones.splice(i, 1);
+    }
+
+    updateCamera(p.width, p.height);
+    updateSound();
+
+    // 活跃度
+    let dLv = 0;
+    if (STATE==='endangered'||STATE==='choice') {
+      if (micOn) dLv = p.map(micLv,0,.5,0,2,true);
+      else { let mv=p.dist(p.mouseX,p.mouseY,p.pmouseX,p.pmouseY); dLv=p.map(mv,0,22,0,1,true); }
+    }
+    SP.forEach((_,i)=>{
+      let pressure = civSmooth * 0.25 + dLv * 0.1;
+      if (pressure > 0.08) { silT=0; vit[i]=p.max(0.02,vit[i]-pressure*0.0008); }
+      else { silT+=p.deltaTime; let r=.0003; for(let z of restrainZones){let dd=Math.sqrt((SP[i].wx-z.wx)**2+(SP[i].wy-z.wy)**2);if(dd<z.radius*2)r+=.001*z.life;} vit[i]=p.min(1,vit[i]+r); }
+    });
+    let showE = STATE==='extinct'||STATE==='endangered'||STATE==='hope'||STATE==='choice';
+    EX.forEach((_,i)=>{ eVit[i]=eVit[i]*.993+(showE?.35:0)*.007; });
+
+    // ===== 应用相机 =====
+    p.push();
+    p.translate(p.width/2, p.height/2);
+    p.scale(cam.z);
+    p.translate(-cam.x, -cam.y);
+
+    // 视口范围 (世界坐标)
+    let vL=cam.x-p.width/(2*cam.z), vR=cam.x+p.width/(2*cam.z);
+    let vT=cam.y-p.height/(2*cam.z), vB=cam.y+p.height/(2*cam.z);
+    let c0=Math.floor(vL/BFS)-1, c1=Math.ceil(vR/BFS)+1;
+    let r0=Math.floor(vT/BFS)-1, r1=Math.ceil(vB/BFS)+1;
+    // 裁剪到网格范围
+    c0=Math.max(GMIN_X,c0); c1=Math.min(GMAX_X-1,c1);
+    r0=Math.max(GMIN_Y,r0); r1=Math.min(GMAX_Y-1,r1);
+
+    let ctx = p.drawingContext; // 直接用Canvas2D渲染文字提升性能
+    let renderSz = BFS * cam.z;
+    let useText = renderSz >= 6;
+    let time = Date.now();
+
+    // ===== 渲染文字层 =====
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let gy = r0; gy <= r1; gy++) {
+      for (let gx = c0; gx <= c1; gx++) {
+        let idx = gridIdx(gx, gy);
+        if (idx < 0 || !landGrid[idx]) continue;
+        let isBorder = landGrid[idx] === 2;
+        let pop = popGrid[idx];
+        let den = gridDensity(gx, gy);
+        if (den < 0.01) continue;
+
+        let px = gx * BFS + BFS/2, py = gy * BFS + BFS/2;
+        let ch = rval(gx, gy);
+
+        if (isBorder) {
+          let ci = Math.floor((time/4000+ch*100))%charsBorder.length;
+          let op = den*(0.4+0.3*Math.sin(time/2000+ch*5));
+          ctx.fillStyle = `rgba(180,180,180,${op})`;
+          if (useText) { ctx.font = `bold ${BFS*0.85}px SimHei,sans-serif`; ctx.fillText(charsBorder[ci],px,py); }
+          else { ctx.fillRect(gx*BFS+BFS*.2,gy*BFS+BFS*.2,BFS*.6,BFS*.6); }
+        } else if (den > 0.5) {
+          // 高密度城市
+          let ci = Math.floor((time/1500+ch*100))%charsCity.length;
+          let op = 0.5+den*0.5;
+          ctx.fillStyle = `rgba(255,255,255,${op*(0.7+0.3*Math.sin(time/1000+ch*8))})`;
+          if (useText) { ctx.font = `${BFS*(0.5+den*0.3)}px SimHei,sans-serif`; ctx.fillText(charsCity[ci],px,py); }
+          else { ctx.fillRect(gx*BFS+1,gy*BFS+1,BFS-2,BFS-2); }
+        } else if (den > 0.15) {
+          // 乡镇
+          if (ch < den*0.7) {
+            let ci = Math.floor((time/3500+ch*100))%charsRural.length;
+            ctx.fillStyle = `rgba(200,200,200,${den*0.6})`;
+            if (useText) { ctx.font = `${BFS*0.7}px SimHei,sans-serif`; ctx.fillText(charsRural[ci],px,py); }
+            else { ctx.fillRect(gx*BFS+BFS*.25,gy*BFS+BFS*.25,BFS*.5,BFS*.5); }
+          }
+        } else if (den > 0.02) {
+          // 稀疏/古老
+          if (ch < den * 0.4) {
+            let chars = pop > 0.1 ? charsAncient : charsNature;
+            let ci = Math.floor((time/6000+ch*100))%chars.length;
+            ctx.fillStyle = `rgba(255,255,255,${den*0.5})`;
+            if (useText) { ctx.font = `${BFS*0.6}px STSong,SimSun,serif`; ctx.fillText(chars[ci],px,py); }
+          }
+        }
+      }
+    }
+
+    // ===== 遏制光晕 =====
+    for (let z of restrainZones) {
+      if (z.life <= 0) continue;
+      let grad = ctx.createRadialGradient(z.wx,z.wy,0,z.wx,z.wy,z.radius);
+      let a = z.life * 0.12;
+      grad.addColorStop(0,`rgba(140,220,170,${a})`);
+      grad.addColorStop(0.6,`rgba(140,220,170,${a*0.2})`);
+      grad.addColorStop(1,'rgba(140,220,170,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(z.wx-z.radius,z.wy-z.radius,z.radius*2,z.radius*2);
+    }
+
+    // ===== 灭绝物种幽灵粒子 =====
+    eGroups.forEach((grp,ei) => {
+      let ev = eVit[ei]; if (ev < .01) return;
+      let [r,g,b] = EX[ei].col;
+      grp.forEach(pt => {
+        let dx=EX[ei].wx-pt.x, dy=EX[ei].wy-pt.y;
+        pt.vx+=dx*.002; pt.vy+=dy*.002;
+        let n=p.noise(pt.x*.003,pt.y*.003,p.frameCount*.007+pt.no);
+        pt.vx+=p.cos(n*p.TWO_PI*2)*.8; pt.vy+=p.sin(n*p.TWO_PI*2)*.8;
+        pt.vx*=.9; pt.vy*=.9; pt.x+=pt.vx; pt.y+=pt.vy;
+        let fl=.5+.5*Math.sin(p.frameCount*.02+pt.phase);
+        let a=ev*55*fl;
+        p.fill(r,g,b,a*.2); p.ellipse(pt.x,pt.y,pt.sz*5);
+        p.fill(r,g,b,a);    p.ellipse(pt.x,pt.y,pt.sz);
+      });
+    });
+
+    // ===== 存活物种粒子 =====
+    if (STATE !== 'intro') {
+      groups.forEach((grp, si) => {
+        let v = vit[si];
+        let [r,g,b] = SP[si].col;
+        let wR = BFS * 10 * v;
+
+        grp.forEach((pt, pi) => {
+          if (!pt.alive) {
+            pt.opacity = Math.max(0, pt.opacity - 0.002);
+            if (pt.opacity > 0) { p.fill(r,g,b,pt.opacity*20); p.ellipse(pt.x,pt.y,pt.sz*.4); }
+            return;
+          }
+
+          // 噪声漫游
+          let n1=p.noise(pt.x*.004+pt.no, pt.y*.004, p.frameCount*.003);
+          let n2=p.noise(pt.x*.004, pt.y*.004+pt.no, p.frameCount*.003+50);
+          pt.vx += (n1-.5)*.5; pt.vy += (n2-.5)*.5;
+
+          // 柔性归巢
+          let hx=SP[si].wx-pt.x, hy=SP[si].wy-pt.y;
+          let hd=Math.sqrt(hx*hx+hy*hy);
+          let hs = hd > wR ? p.map(hd,wR,wR*3,.01,.06) : .002;
+          pt.vx+=hx*hs; pt.vy+=hy*hs;
+
+          // 同伴分离
+          let jS=Math.max(0,pi-8), jE=Math.min(grp.length,pi+8);
+          for(let j=jS;j<jE;j++){
+            if(j===pi||!grp[j].alive) continue;
+            let dx=pt.x-grp[j].x, dy=pt.y-grp[j].y, dd=dx*dx+dy*dy;
+            if(dd<BFS*BFS&&dd>.1){let d=Math.sqrt(dd);pt.vx+=(dx/d)*(1-d/BFS)*.4;pt.vy+=(dy/d)*(1-d/BFS)*.4;}
+          }
+
+          // ★ 躲避文字 — 直接查网格 ★
+          let pgx = Math.floor(pt.x / BFS), pgy = Math.floor(pt.y / BFS);
+          let fleeX = 0, fleeY = 0;
+          // 扫描5x5邻域
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              let ngx = pgx+dx, ngy = pgy+dy;
+              let den = gridDensity(ngx, ngy);
+              if (den < 0.02) continue;
+              // 从有文字的格子逃开
+              let twx = ngx*BFS+BFS/2, twy = ngy*BFS+BFS/2;
+              let fx = pt.x-twx, fy = pt.y-twy;
+              let fd = Math.sqrt(fx*fx+fy*fy);
+              if (fd < 0.1) fd = 0.1;
+              let falloff = 1 / (1 + fd/(BFS*1.5)); // 距离衰减
+              let str = den * 3.5 * falloff;
+              fleeX += (fx/fd) * str;
+              fleeY += (fy/fd) * str;
+            }
+          }
+          pt.vx += fleeX; pt.vy += fleeY;
+
+          // 压力累计
+          let hereDen = gridDensity(pgx, pgy);
+          if (hereDen > 0.03) pt.stress += hereDen * 0.12;
+          else pt.stress = Math.max(0, pt.stress - 0.03);
+          // 高压力→死亡
+          if (pt.stress > 10 && p.random() < 0.015 * (1-v)) {
+            pt.alive = false; pt.opacity = 0.6;
+          }
+
+          // 阻尼
+          pt.vx *= .88; pt.vy *= .88;
+          let spd = Math.sqrt(pt.vx*pt.vx+pt.vy*pt.vy);
+          if (spd > 6) { pt.vx*=6/spd; pt.vy*=6/spd; spd=6; }
+          pt.x += pt.vx; pt.y += pt.vy;
+
+          // 绘制
+          let s01 = Math.min(1, pt.stress/8);
+          let cr=p.constrain(r+s01*40,0,255), cg=p.constrain(g-s01*30,0,255), cb=p.constrain(b-s01*50,0,255);
+          let al = p.map(spd,0,6,160,50)*v;
+          p.fill(cr,cg,cb,al*.12); p.ellipse(pt.x,pt.y,pt.sz*5);
+          p.fill(cr,cg,cb,al*.8);  p.ellipse(pt.x,pt.y,pt.sz*(1+spd*.05));
+          if (spd>1.5) { p.fill(cr,cg,cb,al*.2); p.ellipse(pt.x-pt.vx*1.5,pt.y-pt.vy*1.5,pt.sz*.5); }
+        });
+      });
+    }
+
+    p.pop(); // 还原相机
+
+    // ===== HUD =====
+    if (dLv>.04) {
+      let bh=p.map(dLv,0,2,0,90);
+      p.fill(255,255,255,18); p.rect(p.width-15,p.height/2-45,5,90,2);
+      p.fill(255,p.map(dLv,0,2,200,30),30,170); p.rect(p.width-15,p.height/2+45-bh,5,bh,2);
+    }
+  };
+
+  p.windowResized = () => {
+    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    if (geoReady) buildParticles();
+  };
+});
+</script>
+</body>
+</html>

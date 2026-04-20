@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>位图转粒子 · 调参版</title>
+  <style>
+    :root {
+      --bg: #090b0f;
+      --panel: rgba(15, 19, 27, 0.86);
+      --line: rgba(255, 255, 255, 0.12);
+      --txt: #e8ecf5;
+      --muted: rgba(232, 236, 245, 0.72);
+      --accent: #7fd8ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 20% 20%, #182130 0%, var(--bg) 56%);
+      color: var(--txt);
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #panel {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: min(340px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 14px 14px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+    }
+
+    .row {
+      margin-bottom: 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .value {
+      color: var(--txt);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    select,
+    button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--txt);
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+
+    button {
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #stats {
+      margin: 4px 0 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      white-space: pre-line;
+    }
+
+    @media (max-width: 920px) {
+      #panel {
+        left: 12px;
+        right: 12px;
+        top: 12px;
+        width: auto;
+        max-height: min(48vh, 420px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <aside id="panel">
+    <div class="row">
+      <label class="label" for="asset">素材图</label>
+      <select id="asset"></select>
+    </div>
+
+    <div id="stats">正在加载...</div>
+
+    <div id="controls"></div>
+
+    <button id="reseed" type="button">重新采样</button>
+  </aside>
+
+  <script>
+    (() => {
+      const ASSETS = [
+        { key: "porpoise_cut", label: "长江江豚（抠图）", file: "长江江豚.png" },
+        { key: "tiger_cut", label: "华南虎（抠图）", file: "华南虎.png" },
+        { key: "baiji_cut", label: "白鳍豚（抠图）", file: "白鳍豚.png" },
+        { key: "softshell_cut", label: "斑鳖（抠图）", file: "斑鳖.png" },
+        { key: "ibis_cut", label: "朱鹮（抠图）", file: "朱鹮.png" },
+        { key: "alligator_cut", label: "扬子鳄（抠图）", file: "扬子鳄.png" },
+        { key: "snowleopard_cut", label: "雪豹（抠图）", file: "雪豹.png" },
+        { key: "xjtiger_cut", label: "新疆虎（抠图）", file: "新疆虎.png" }
+      ];
+      const ASSET_BASES = [
+        "../sours/crap/",
+        "./sours/crap/",
+        "sours/crap/",
+        "/sours/crap/"
+      ];
+
+      const state = {
+        assetKey: "porpoise_cut",
+        rasterSize: 320,
+        fitScale: 0.86,
+        gap: 4,
+        jitter: 0.55,
+        levels: 3,
+        ditherStrength: 1,
+        alphaCutoff: 0.08,
+        contrast: 1.35,
+        gamma: 1.0,
+        edgeBoost: 0.3,
+        particleSize: 1.35,
+        particleAlpha: 0.88,
+        maxParticles: 15000
+      };
+
+      const CONTROL_SCHEMA = [
+        { key: "rasterSize", label: "采样分辨率", min: 120, max: 520, step: 2 },
+        { key: "fitScale", label: "主体缩放", min: 0.5, max: 1, step: 0.01 },
+        { key: "gap", label: "粒子间距", min: 2, max: 10, step: 1 },
+        { key: "jitter", label: "采样抖动", min: 0, max: 1.8, step: 0.01 },
+        { key: "levels", label: "抖动量化级数", min: 2, max: 8, step: 1 },
+        { key: "ditherStrength", label: "抖动强度", min: 0, max: 1, step: 0.01 },
+        { key: "alphaCutoff", label: "透明裁切阈值", min: 0, max: 0.35, step: 0.01 },
+        { key: "contrast", label: "对比度", min: 0.6, max: 2.6, step: 0.01 },
+        { key: "gamma", label: "灰阶Gamma", min: 0.45, max: 2.2, step: 0.01 },
+        { key: "edgeBoost", label: "轮廓增强", min: 0, max: 1, step: 0.01 },
+        { key: "particleSize", label: "粒子尺寸", min: 0.5, max: 3.2, step: 0.01 },
+        { key: "particleAlpha", label: "粒子透明度", min: 0.2, max: 1, step: 0.01 },
+        { key: "maxParticles", label: "粒子上限", min: 1000, max: 32000, step: 100 }
+      ];
+
+      const canvas = document.getElementById("stage");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const panelAsset = document.getElementById("asset");
+      const controlsWrap = document.getElementById("controls");
+      const stats = document.getElementById("stats");
+      const reseedBtn = document.getElementById("reseed");
+
+      const off = document.createElement("canvas");
+      const octx = off.getContext("2d", { willReadFrequently: true });
+
+      let dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let W = 0;
+      let H = 0;
+      let activeImage = null;
+      let particles = [];
+      let rebuildTimer = null;
+      let needsRebuild = false;
+
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const mix = (a, b, t) => a + (b - a) * t;
+      const smoothstep = (edge0, edge1, x) => {
+        const t = clamp((x - edge0) / (edge1 - edge0 || 1e-6), 0, 1);
+        return t * t * (3 - 2 * t);
+      };
+      const isCanvasTaintedError = (err) => {
+        if (!err) return false;
+        const name = String(err.name || "");
+        const msg = String(err.message || "");
+        return name === "SecurityError" || /tainted|cross-origin/i.test(msg);
+      };
+      const getAssetByKey = (key) => ASSETS.find((it) => it.key === key) || ASSETS[0];
+      const buildAssetCandidates = (file) => {
+        const encoded = encodeURIComponent(file).replace(/%2F/g, "/");
+        const out = [];
+        ASSET_BASES.forEach((base) => {
+          out.push(`${base}${file}`);
+          out.push(`${base}${encoded}`);
+        });
+        return Array.from(new Set(out));
+      };
+
+      function formatValue(v, step) {
+        if (Number.isInteger(step)) return String(Math.round(v));
+        const digits = step < 0.1 ? 2 : 1;
+        return Number(v).toFixed(digits);
+      }
+
+      function initPanel() {
+        ASSETS.forEach((item) => {
+          const opt = document.createElement("option");
+          opt.value = item.key;
+          opt.textContent = item.label;
+          panelAsset.appendChild(opt);
+        });
+        panelAsset.value = state.assetKey;
+
+        panelAsset.addEventListener("change", () => {
+          state.assetKey = panelAsset.value;
+          loadImageAndBuild();
+        });
+
+        CONTROL_SCHEMA.forEach((cfg) => {
+          const row = document.createElement("div");
+          row.className = "row";
+
+          const label = document.createElement("label");
+          label.className = "label";
+          label.htmlFor = cfg.key;
+          label.innerHTML = `<span>${cfg.label}</span><span class="value" id="val-${cfg.key}"></span>`;
+
+          const input = document.createElement("input");
+          input.type = "range";
+          input.id = cfg.key;
+          input.min = String(cfg.min);
+          input.max = String(cfg.max);
+          input.step = String(cfg.step);
+          input.value = String(state[cfg.key]);
+
+          const valEl = label.querySelector(".value");
+          valEl.textContent = formatValue(state[cfg.key], cfg.step);
+
+          input.addEventListener("input", () => {
+            const v = Number(input.value);
+            state[cfg.key] = v;
+            valEl.textContent = formatValue(v, cfg.step);
+            scheduleRebuild();
+          });
+
+          row.appendChild(label);
+          row.appendChild(input);
+          controlsWrap.appendChild(row);
+        });
+
+        reseedBtn.addEventListener("click", () => scheduleRebuild(true));
+      }
+
+      function resize() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(W * dpr);
+        canvas.height = Math.floor(H * dpr);
+        canvas.style.width = `${W}px`;
+        canvas.style.height = `${H}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function scheduleRebuild(force = false) {
+        if (!activeImage) return;
+        needsRebuild = needsRebuild || force;
+        if (rebuildTimer) clearTimeout(rebuildTimer);
+        rebuildTimer = setTimeout(() => {
+          rebuildTimer = null;
+          try {
+            buildParticles(activeImage, needsRebuild);
+          } catch (err) {
+            console.error(err);
+            if (err && err.code === "TAINTED_CANVAS") {
+              stats.textContent = "当前图片因跨域限制无法读取像素，请切换同源路径或使用本地 HTTP 服务打开页面。";
+            } else {
+              stats.textContent = "重建粒子失败，请检查控制参数。";
+            }
+          } finally {
+            needsRebuild = false;
+          }
+        }, 50);
+      }
+
+      function loadImageElement(src, crossOrigin = null) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          if (crossOrigin !== null) img.crossOrigin = crossOrigin;
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`load failed: ${src}`));
+          img.src = src;
+        });
+      }
+
+      function loadImageFromBlob(blob, originalSrc) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            img.__resolvedSrc = originalSrc;
+            img.__safeSource = true;
+            resolve(img);
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error(`blob load failed: ${originalSrc}`));
+          };
+          img.src = url;
+        });
+      }
+
+      async function loadImage(src) {
+        // 优先 fetch + blob，确保图片同源可读，避免 canvas taint。
+        if (location.protocol !== "file:") {
+          try {
+            const res = await fetch(src, { cache: "no-store", mode: "same-origin" });
+            if (!res.ok) throw new Error(`fetch failed: ${src} (${res.status})`);
+            const blob = await res.blob();
+            const img = await loadImageFromBlob(blob, src);
+            return img;
+          } catch (err) {
+            try {
+              const res = await fetch(src, { cache: "no-store", mode: "cors" });
+              if (!res.ok) throw new Error(`fetch failed: ${src} (${res.status})`);
+              const blob = await res.blob();
+              const img = await loadImageFromBlob(blob, src);
+              return img;
+            } catch (_fallbackErr) {
+              void err;
+            }
+          }
+        }
+
+        const img = await loadImageElement(src, "anonymous");
+        img.__resolvedSrc = src;
+        img.__safeSource = false;
+        return img;
+      }
+
+      function otsuThreshold(hist, total) {
+        let sum = 0;
+        for (let i = 0; i < 256; i += 1) sum += i * hist[i];
+
+        let sumB = 0;
+        let wB = 0;
+        let maxVariance = -1;
+        let threshold = 128;
+
+        for (let i = 0; i < 256; i += 1) {
+          wB += hist[i];
+          if (wB <= 1e-6) continue;
+          const wF = total - wB;
+          if (wF <= 1e-6) break;
+
+          sumB += i * hist[i];
+          const mB = sumB / wB;
+          const mF = (sum - sumB) / wF;
+          const between = wB * wF * (mB - mF) * (mB - mF);
+
+          if (between > maxVariance) {
+            maxVariance = between;
+            threshold = i;
+          }
+        }
+        return threshold;
+      }
+
+      function floydSteinberg(field, w, h, levels) {
+        const out = new Float32Array(field.length);
+        const err = new Float32Array(field.length);
+        const lv = Math.max(2, levels | 0);
+
+        for (let y = 0; y < h; y += 1) {
+          for (let x = 0; x < w; x += 1) {
+            const i = y * w + x;
+            const oldVal = clamp(field[i] + err[i], 0, 1);
+            const newVal = Math.round(oldVal * (lv - 1)) / (lv - 1);
+            const diff = oldVal - newVal;
+            out[i] = newVal;
+
+            if (x + 1 < w) err[i + 1] += diff * (7 / 16);
+            if (y + 1 < h) {
+              if (x > 0) err[i + w - 1] += diff * (3 / 16);
+              err[i + w] += diff * (5 / 16);
+              if (x + 1 < w) err[i + w + 1] += diff * (1 / 16);
+            }
+          }
+        }
+        return out;
+      }
+
+      function buildParticles(img, reseed = false) {
+        const rw = Math.round(state.rasterSize);
+        const rh = Math.max(80, Math.round((rw * img.height) / img.width));
+
+        off.width = rw;
+        off.height = rh;
+        octx.clearRect(0, 0, rw, rh);
+
+        const fit = clamp(state.fitScale, 0.3, 1);
+        let dw = rw * fit;
+        let dh = (dw * img.height) / img.width;
+        if (dh > rh * fit) {
+          dh = rh * fit;
+          dw = (dh * img.width) / img.height;
+        }
+        const dx = (rw - dw) * 0.5;
+        const dy = (rh - dh) * 0.5;
+        octx.drawImage(img, dx, dy, dw, dh);
+
+        let data = null;
+        try {
+          data = octx.getImageData(0, 0, rw, rh).data;
+        } catch (err) {
+          if (isCanvasTaintedError(err)) {
+            const e = new Error("canvas tainted by cross-origin data");
+            e.code = "TAINTED_CANVAS";
+            throw e;
+          }
+          throw err;
+        }
+        const len = rw * rh;
+        const lum = new Float32Array(len);
+        const alpha = new Float32Array(len);
+        const mask = new Float32Array(len);
+        const field = new Float32Array(len);
+
+        for (let y = 0; y < rh; y += 1) {
+          for (let x = 0; x < rw; x += 1) {
+            const i = y * rw + x;
+            const p = i * 4;
+            const a = data[p + 3] / 255;
+            const l = (data[p] * 0.2126 + data[p + 1] * 0.7152 + data[p + 2] * 0.0722) / 255;
+            lum[i] = l;
+            alpha[i] = a;
+          }
+        }
+
+        const contrast = state.contrast;
+        const gamma = state.gamma;
+        const edgeMix = clamp(state.edgeBoost, 0, 1);
+        const alphaCutoff = clamp(state.alphaCutoff, 0, 1);
+        let solidPixelCount = 0;
+
+        for (let y = 0; y < rh; y += 1) {
+          for (let x = 0; x < rw; x += 1) {
+            const i = y * rw + x;
+            const a = alpha[i];
+            if (a <= alphaCutoff) continue;
+            solidPixelCount += 1;
+
+            const n = lum[i];
+            const left = lum[y * rw + Math.max(0, x - 1)];
+            const right = lum[y * rw + Math.min(rw - 1, x + 1)];
+            const up = lum[Math.max(0, y - 1) * rw + x];
+            const down = lum[Math.min(rh - 1, y + 1) * rw + x];
+            const gx = right - left;
+            const gy = down - up;
+            const edge = clamp(Math.sqrt(gx * gx + gy * gy) * 2.2, 0, 1);
+
+            const tone = 1 - Math.abs(n - 0.5) * 1.2;
+            let detail = clamp((tone - 0.5) * contrast + 0.5, 0, 1);
+            detail = clamp(Math.pow(detail, gamma), 0, 1);
+
+            const m = smoothstep(alphaCutoff, Math.min(1, alphaCutoff + 0.08), a);
+            const dens = clamp(mix(detail, edge, edgeMix) * m, 0, 1);
+
+            mask[i] = m;
+            field[i] = dens;
+          }
+        }
+
+        const dithered = floydSteinberg(field, rw, rh, state.levels);
+        const created = [];
+
+        const scale = Math.min((W * 0.74) / rw, (H * 0.84) / rh);
+        const ox = (W - rw * scale) * 0.5;
+        const oy = (H - rh * scale) * 0.52;
+
+        const gap = Math.max(1, Math.round(state.gap));
+        const jitterAmp = state.jitter * gap;
+        const maxParticles = Math.max(1, Math.round(state.maxParticles));
+
+        for (let y = 0; y < rh; y += gap) {
+          for (let x = 0; x < rw; x += gap) {
+            const sx = Math.min(rw - 1, x | 0);
+            const sy = Math.min(rh - 1, y | 0);
+            const i = sy * rw + sx;
+
+            const m = mask[i];
+            if (m < 0.03) continue;
+
+            const chance = clamp(
+              dithered[i] * state.ditherStrength + field[i] * (1 - state.ditherStrength),
+              0,
+              1
+            );
+            if (chance <= 0.01 || Math.random() > chance) continue;
+
+            const jx = (Math.random() * 2 - 1) * jitterAmp;
+            const jy = (Math.random() * 2 - 1) * jitterAmp;
+
+            const tx = ox + (x + jx) * scale;
+            const ty = oy + (y + jy) * scale;
+
+            const p = i * 4;
+            const cr = data[p];
+            const cg = data[p + 1];
+            const cb = data[p + 2];
+
+            created.push({
+              x: reseed ? Math.random() * W : tx + (Math.random() * 2 - 1) * 26,
+              y: reseed ? Math.random() * H : ty + (Math.random() * 2 - 1) * 26,
+              tx,
+              ty,
+              seed: Math.random() * Math.PI * 2,
+              size: state.particleSize * (0.7 + chance * 1.45),
+              alpha: state.particleAlpha * (0.35 + 0.65 * chance),
+              color: `rgb(${cr}, ${cg}, ${cb})`
+            });
+          }
+        }
+
+        if (created.length > maxParticles) {
+          for (let i = created.length - 1; i >= maxParticles; i -= 1) {
+            const k = (Math.random() * (i + 1)) | 0;
+            const tmp = created[i];
+            created[i] = created[k];
+            created[k] = tmp;
+          }
+          created.length = maxParticles;
+        }
+
+        particles = created;
+        const src = img.__resolvedSrc || "unknown";
+        stats.textContent = `粒子数 ${particles.length.toLocaleString()} · 有效像素 ${solidPixelCount.toLocaleString()} · 采样源 ${src}`;
+      }
+
+      async function loadImageAndBuild() {
+        stats.textContent = "正在加载图片...";
+        const asset = getAssetByKey(state.assetKey);
+        const candidates = buildAssetCandidates(asset.file);
+        const failed = [];
+
+        for (let i = 0; i < candidates.length; i += 1) {
+          const src = candidates[i];
+          try {
+            const img = await loadImage(src);
+            buildParticles(img, true);
+            activeImage = img;
+            return;
+          } catch (err) {
+            failed.push({ src, err });
+            console.error(err);
+          }
+        }
+
+        const tried = candidates.map((s) => `\n- ${s}`).join("");
+        const tainted = failed.some((it) => it.err && (it.err.code === "TAINTED_CANVAS" || isCanvasTaintedError(it.err)));
+        if (tainted) {
+          if (location.protocol === "file:") {
+            stats.textContent = `检测到 file:// 跨域限制，浏览器无法读取本地图片像素。\n请改为本地服务打开：\npython3 -m http.server 8080\n然后访问 /原型/位图转粒子_调参版.html\n尝试过：${tried}`;
+          } else {
+            stats.textContent = `检测到跨域图片污染，请保证图片与页面同源。\n尝试过：${tried}`;
+          }
+          return;
+        }
+
+        stats.textContent = `图片加载失败，请检查路径。尝试过：${tried}`;
+      }
+
+      function drawBackground(t) {
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        g.addColorStop(0, "#101728");
+        g.addColorStop(0.6, "#0a111f");
+        g.addColorStop(1, "#070b12");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = "#8ecaff";
+        ctx.beginPath();
+        ctx.arc(W * 0.18 + Math.sin(t * 0.0003) * 24, H * 0.18, Math.min(W, H) * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      function render(t) {
+        drawBackground(t);
+
+        ctx.globalCompositeOperation = "lighter";
+
+        for (let i = 0; i < particles.length; i += 1) {
+          const p = particles[i];
+          p.x += (p.tx - p.x) * 0.08;
+          p.y += (p.ty - p.y) * 0.08;
+
+          const swayX = Math.sin(t * 0.0012 + p.seed) * 0.35;
+          const swayY = Math.cos(t * 0.001 + p.seed * 1.3) * 0.25;
+
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x + swayX, p.y + swayY, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        requestAnimationFrame(render);
+      }
+
+      initPanel();
+      resize();
+      loadImageAndBuild();
+      requestAnimationFrame(render);
+
+      window.addEventListener("resize", () => {
+        resize();
+        scheduleRebuild(true);
+      });
+    })();
+  </script>
+</body>
+</html>

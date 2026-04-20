@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>双物种粒子文字包围原型</title>
+  <style>
+    @font-face {
+      font-family: "MoFang";
+      src:
+        url("../sours/HYPixel11pxU-2.ttf") format("truetype"),
+        url("./sours/HYPixel11pxU-2.ttf") format("truetype"),
+        url("sours/HYPixel11pxU-2.ttf") format("truetype");
+      font-display: swap;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #060a12;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+
+  <script>
+    (() => {
+      const INTRO_WORDS_2 = [
+        "工地", "楼群", "人流", "路网", "施工", "扩张", "开发", "占有", "平台", "算法",
+        "数据", "资本", "商圈", "车流", "通勤", "夜班", "产线", "园区", "并网", "调度",
+        "订单", "分发", "系统", "控制", "厂区", "物流", "广告", "灯牌", "轨道", "电网"
+      ];
+      const INTRO_WORDS_3 = [
+        "城市化", "工业化", "平台化", "数据流", "人群像", "通勤线", "高架桥", "施工线",
+        "扩建区", "开发带", "物流链", "供应链", "算法流", "资本流", "订单流", "调度网",
+        "商圈化", "夜经济", "新园区", "并网区"
+      ];
+      const INTRO_WORDS_LONG = [
+        "现代化扩建", "平台算法调度", "城市更新带", "人类活动场", "开发占有区", "资本回路网"
+      ];
+      const RURAL_NATURE = [
+        "乡", "镇", "村", "农", "田", "路", "舍", "渠", "集", "桥",
+        "林", "森", "野", "山", "谷", "川", "渊", "莽"
+      ];
+
+      const SPECIES_CONFIG = [
+        {
+          key: "baiji",
+          status: "extinct",
+          imageFile: "白鳍豚.png",
+          imageBases: ["../sours/crap/", "./sours/crap/", "sours/crap/"],
+          audioFile: "白鳍豚.mp3",
+          audioBases: ["../sours/sound/", "./sours/sound/", "sours/sound/"],
+          tint: [150, 218, 255],
+          wordPoolA: [...INTRO_WORDS_2, ...INTRO_WORDS_3, ...INTRO_WORDS_LONG],
+          wordPoolB: [...INTRO_WORDS_2, ...INTRO_WORDS_3, ...INTRO_WORDS_LONG]
+        },
+        {
+          key: "ibis",
+          status: "endangered",
+          imageFile: "朱鹮.png",
+          imageBases: ["../sours/crap/", "./sours/crap/", "sours/crap/"],
+          audioFile: "朱鹮.mp3",
+          audioBases: ["../sours/sound/", "./sours/sound/", "sours/sound/"],
+          tint: [255, 186, 214],
+          wordPoolA: [...INTRO_WORDS_3, ...RURAL_NATURE],
+          wordPoolB: [...INTRO_WORDS_2, ...RURAL_NATURE]
+        }
+      ];
+
+      const PARTICLE_COUNT = 1450;
+      const RASTER_WIDTH = 300;
+      const ALPHA_CUTOFF = 20;
+      const HOME_FOLLOW = 0.058;
+      const SPECTRUM_FOLLOW = 0.082;
+      const ALPHA_EASE = 0.08;
+      const SIZE_EASE = 0.08;
+      const TEXT_FLOW_SPEED = 0.21;
+      const TEXT_GRID_STEP = 13;
+      const TEXT_X_STEP = TEXT_GRID_STEP;
+      const AVOID_RADIUS_X = 9;
+      const AVOID_RADIUS_Y = 9;
+      const AVOID_DILATE_PASSES = 1;
+      const BG_TEXT_FLOW_SPEED = 0.55;
+      const BG_TEXT_EDGE_THRESHOLD = 0.92;
+      const TEXT_FONT_SCALE = 0.94;
+
+      const canvas = document.getElementById("stage");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const off = document.createElement("canvas");
+      const offCtx = off.getContext("2d", { willReadFrequently: true });
+
+      let dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let W = 0;
+      let H = 0;
+
+      let audioCtx = null;
+      let currentActive = null;
+      let runtimeMessage = "";
+
+      const species = [];
+      const globalText = {
+        runTop: "",
+        runBottom: "",
+        seedTop: 0,
+        seedBottom: 0
+      };
+      let globalGrid = [];
+
+      function clamp(v, min, max) {
+        return Math.max(min, Math.min(max, v));
+      }
+
+      function mod(n, m) {
+        return ((n % m) + m) % m;
+      }
+
+      function hash3(a, b, c) {
+        const s = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453123;
+        return s - Math.floor(s);
+      }
+
+      function resize() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(W * dpr);
+        canvas.height = Math.floor(H * dpr);
+        canvas.style.width = `${W}px`;
+        canvas.style.height = `${H}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        rebuildGlobalTextGrid();
+
+        species.forEach((sp, index) => {
+          sp.anchor = getAnchor(index);
+          if (sp.image) {
+            buildSpeciesParticles(sp, true);
+            if (sp.outcomeApplied) {
+              if (sp.status === "extinct") applyExtinctOutcome(sp);
+              else applyEndangeredOutcome(sp);
+            }
+          }
+        });
+        rebuildAllTextAvoidFields();
+      }
+
+      function getAnchor(index) {
+        if (W >= 920) {
+          return {
+            x: W * (index === 0 ? 0.33 : 0.67),
+            y: H * 0.54
+          };
+        }
+        return {
+          x: W * 0.5,
+          y: H * (index === 0 ? 0.35 : 0.73)
+        };
+      }
+
+      function buildCandidates(file, bases) {
+        const encoded = encodeURIComponent(file);
+        const out = [];
+        for (let i = 0; i < bases.length; i += 1) {
+          out.push(`${bases[i]}${file}`);
+          out.push(`${bases[i]}${encoded}`);
+        }
+        return Array.from(new Set(out));
+      }
+
+      function isCanvasTaintedError(err) {
+        if (!err) return false;
+        const name = String(err.name || "");
+        const msg = String(err.message || "");
+        return name === "SecurityError" || /tainted|cross-origin/i.test(msg);
+      }
+
+      function loadImage(src) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`load image failed: ${src}`));
+          img.src = src;
+        });
+      }
+
+      function loadImageFromBlob(blob, src) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            img.__resolvedSrc = src;
+            resolve(img);
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error(`blob image decode failed: ${src}`));
+          };
+          img.src = url;
+        });
+      }
+
+      async function loadImageWithFallback(file, bases) {
+        const cands = buildCandidates(file, bases);
+        let lastErr = null;
+        for (let i = 0; i < cands.length; i += 1) {
+          const src = cands[i];
+          try {
+            let img = null;
+            if (location.protocol !== "file:") {
+              const res = await fetch(src, { cache: "no-store" });
+              if (res.ok) {
+                const blob = await res.blob();
+                img = await loadImageFromBlob(blob, src);
+              }
+            }
+            if (!img) img = await loadImage(src);
+            img.__resolvedSrc = src;
+            return img;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        throw lastErr || new Error("image load failed");
+      }
+
+      async function createAudioElement(file, bases) {
+        const cands = buildCandidates(file, bases);
+        for (let i = 0; i < cands.length; i += 1) {
+          try {
+            const res = await fetch(cands[i], { cache: "no-store" });
+            if (!res.ok) continue;
+            const audio = new Audio(cands[i]);
+            audio.preload = "auto";
+            audio.crossOrigin = "anonymous";
+            return audio;
+          } catch (_err) {
+            continue;
+          }
+        }
+        return null;
+      }
+
+      function pickWord(pool) {
+        const r = Math.random();
+        if (r < 0.56) return pool[(Math.random() * Math.min(pool.length, 26)) | 0];
+        if (r < 0.9) return pool[(Math.random() * Math.min(pool.length, 42)) | 0];
+        return pool[(Math.random() * pool.length) | 0];
+      }
+
+      function buildWordRun(pool, targetChars) {
+        let s = "";
+        while (s.length < targetChars) s += pickWord(pool);
+        return s;
+      }
+
+      function initTextRuns(sp) {
+        const hChars = Math.max(360, Math.ceil(W / TEXT_GRID_STEP) * 24);
+        sp.text.runTop = buildWordRun(sp.conf.wordPoolA, hChars);
+        sp.text.runBottom = buildWordRun(sp.conf.wordPoolB, hChars);
+        sp.text.seedTop = Math.random() * 1000;
+        sp.text.seedBottom = Math.random() * 1000;
+      }
+
+      function initGlobalTextRuns() {
+        const pool = [...INTRO_WORDS_2, ...INTRO_WORDS_3, ...INTRO_WORDS_LONG, ...RURAL_NATURE];
+        const hChars = Math.max(700, Math.ceil(W / TEXT_GRID_STEP) * 52);
+        globalText.runTop = buildWordRun(pool, hChars);
+        globalText.runBottom = buildWordRun(pool, hChars);
+        globalText.seedTop = Math.random() * 1000;
+        globalText.seedBottom = Math.random() * 1000;
+      }
+
+      function rebuildGlobalTextGrid() {
+        if (!globalText.runTop || !globalText.runBottom) initGlobalTextRuns();
+        const points = [];
+        const y0 = TEXT_GRID_STEP * 0.65;
+        const x0 = TEXT_X_STEP * 0.6;
+        for (let y = y0; y < H; y += TEXT_GRID_STEP) {
+          const row = Math.floor(y / TEXT_GRID_STEP);
+          for (let x = x0; x < W; x += TEXT_X_STEP) {
+            const col = Math.floor(x / TEXT_X_STEP);
+            points.push({ x, y, row, col });
+          }
+        }
+        globalGrid = points;
+      }
+
+      function makeSpeciesState(conf, index) {
+        return {
+          key: conf.key,
+          conf,
+          status: conf.status || "endangered",
+          anchor: getAnchor(index),
+          interactive: true,
+          outcomeApplied: false,
+          storyState: "intact",
+          image: null,
+          imageReady: false,
+          audio: null,
+          audioReady: false,
+          analyser: null,
+          source: null,
+          gain: null,
+          freqData: null,
+          particles: [],
+          homeTargets: [],
+          hitMap: null,
+          shape: { w: 240, h: 180 },
+          mode: "bio",
+          spectrum: {
+            cols: 56,
+            width: 0,
+            height: 0,
+            jump: null
+          },
+          text: {
+            runTop: "",
+            runBottom: "",
+            seedTop: 0,
+            seedBottom: 0,
+            coverage: conf.status === "extinct" ? 0.58 : 0.5,
+            targetCoverage: conf.status === "extinct" ? 0.58 : 0.5,
+            density: conf.status === "extinct" ? 0.8 : 0.74,
+            targetDensity: conf.status === "extinct" ? 0.8 : 0.74,
+            avoidField: null
+          }
+        };
+      }
+
+      function shuffledIndices(n) {
+        const arr = new Uint32Array(n);
+        for (let i = 0; i < n; i += 1) arr[i] = i;
+        for (let i = n - 1; i > 0; i -= 1) {
+          const j = (Math.random() * (i + 1)) | 0;
+          const t = arr[i];
+          arr[i] = arr[j];
+          arr[j] = t;
+        }
+        return arr;
+      }
+
+      function buildSpeciesParticles(sp, reseed = false) {
+        const img = sp.image;
+        if (!img) return;
+
+        const rw = RASTER_WIDTH;
+        const rh = Math.max(80, Math.round((rw * img.height) / img.width));
+
+        off.width = rw;
+        off.height = rh;
+        offCtx.clearRect(0, 0, rw, rh);
+
+        offCtx.drawImage(img, 0, 0, rw, rh);
+        let data = null;
+        try {
+          data = offCtx.getImageData(0, 0, rw, rh).data;
+        } catch (err) {
+          if (isCanvasTaintedError(err)) {
+            runtimeMessage = "检测到图片跨域像素限制，请用本地 HTTP 服务打开该页面。";
+            sp.particles = [];
+            sp.homeTargets = [];
+            sp.hitMap = null;
+            return;
+          }
+          throw err;
+        }
+
+        const solid = [];
+        for (let y = 0; y < rh; y += 1) {
+          for (let x = 0; x < rw; x += 1) {
+            const i = y * rw + x;
+            const a = data[i * 4 + 3];
+            if (a > ALPHA_CUTOFF) solid.push(i);
+          }
+        }
+
+        if (!solid.length) {
+          sp.particles = [];
+          sp.homeTargets = [];
+          return;
+        }
+
+        const scale = Math.min((W >= 920 ? W * 0.34 : W * 0.62) / rw, (H >= 920 ? H * 0.52 : H * 0.28) / rh);
+        const ox = sp.anchor.x - (rw * scale) * 0.5;
+        const oy = sp.anchor.y - (rh * scale) * 0.5;
+
+        sp.shape.w = rw * scale;
+        sp.shape.h = rh * scale;
+
+        const order = shuffledIndices(solid.length);
+        const home = [];
+
+        for (let i = 0; i < PARTICLE_COUNT; i += 1) {
+          const idx = solid[order[i % order.length]];
+          const sx = idx % rw;
+          const sy = (idx / rw) | 0;
+          const jitter = 0.34;
+
+          const tx = ox + (sx + (Math.random() * 2 - 1) * jitter) * scale;
+          const ty = oy + (sy + (Math.random() * 2 - 1) * jitter) * scale;
+          const p = idx * 4;
+          const r = data[p];
+          const g = data[p + 1];
+          const b = data[p + 2];
+
+          home.push({
+            tx,
+            ty,
+            color: `rgb(${r}, ${g}, ${b})`,
+            size: 0.8 + Math.random() * 1.35,
+            alpha: 1
+          });
+        }
+
+        if (!sp.particles.length || reseed) {
+          sp.particles = home.map((h) => ({
+            x: sp.anchor.x + (Math.random() * 2 - 1) * 66,
+            y: sp.anchor.y + (Math.random() * 2 - 1) * 66,
+            tx: h.tx,
+            ty: h.ty,
+            bioTx: h.tx,
+            bioTy: h.ty,
+            baseSize: h.size,
+            baseAlpha: h.alpha,
+            targetSize: h.size,
+            targetAlpha: h.alpha,
+            size: h.size,
+            alpha: h.alpha,
+            phase: Math.random() * Math.PI * 2,
+            color: h.color
+          }));
+        } else {
+          for (let i = 0; i < sp.particles.length; i += 1) {
+            const p = sp.particles[i];
+            p.tx = home[i].tx;
+            p.ty = home[i].ty;
+            p.bioTx = home[i].tx;
+            p.bioTy = home[i].ty;
+            p.baseSize = home[i].size;
+            p.baseAlpha = home[i].alpha;
+            p.targetSize = home[i].size;
+            p.targetAlpha = home[i].alpha;
+            p.size = home[i].size;
+            p.alpha = home[i].alpha;
+            p.color = home[i].color;
+          }
+        }
+
+        sp.homeTargets = home;
+        sp.hitMap = {
+          rw,
+          rh,
+          ox,
+          oy,
+          scale,
+          alpha: new Uint8Array(rw * rh)
+        };
+
+        for (let i = 0; i < rw * rh; i += 1) sp.hitMap.alpha[i] = data[i * 4 + 3];
+
+        sp.spectrum.width = Math.min(W >= 920 ? W * 0.31 : W * 0.74, 470);
+        sp.spectrum.height = Math.min(H >= 920 ? H * 0.27 : H * 0.2, 240);
+        if (!sp.spectrum.jump || sp.spectrum.jump.length !== sp.spectrum.cols) {
+          sp.spectrum.jump = new Float32Array(sp.spectrum.cols);
+        } else {
+          sp.spectrum.jump.fill(0);
+        }
+      }
+
+      function ensureAudioContext() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      }
+
+      function ensureAudioGraph(sp) {
+        if (!sp.audio) return false;
+        ensureAudioContext();
+        if (sp.source) return true;
+
+        sp.source = audioCtx.createMediaElementSource(sp.audio);
+        sp.analyser = audioCtx.createAnalyser();
+        sp.analyser.fftSize = 256;
+        sp.gain = audioCtx.createGain();
+        sp.gain.gain.value = 0.96;
+
+        sp.source.connect(sp.analyser);
+        sp.analyser.connect(sp.gain);
+        sp.gain.connect(audioCtx.destination);
+
+        sp.freqData = new Uint8Array(sp.analyser.frequencyBinCount);
+        return true;
+      }
+
+      function restoreBio(sp) {
+        if (sp.storyState === "gone") return;
+        sp.mode = "bio";
+        const pts = sp.particles;
+        for (let i = 0; i < pts.length; i += 1) {
+          const p = pts[i];
+          p.tx = p.bioTx;
+          p.ty = p.bioTy;
+          p.targetAlpha = p.baseAlpha;
+          p.targetSize = p.baseSize;
+        }
+        rebuildTextAvoidField(sp);
+      }
+
+      function applyExtinctOutcome(sp) {
+        sp.storyState = "gone";
+        sp.mode = "decay";
+        sp.interactive = false;
+        sp.hitMap = null;
+        sp.text.avoidField = null;
+        sp.text.targetCoverage = 1.52;
+        sp.text.targetDensity = 1;
+        const pts = sp.particles;
+        for (let i = 0; i < pts.length; i += 1) {
+          const p = pts[i];
+          const a = Math.random() * Math.PI * 2;
+          const d = 150 + Math.random() * 360;
+          p.tx = p.x + Math.cos(a) * d;
+          p.ty = p.y + Math.sin(a) * d;
+          p.targetAlpha = 0;
+          p.targetSize = 0.06;
+        }
+      }
+
+      function applyEndangeredOutcome(sp) {
+        sp.storyState = "declined";
+        sp.mode = "bio";
+        sp.text.targetCoverage = 0.98;
+        sp.text.targetDensity = 0.92;
+
+        const pts = sp.particles;
+        const keep = Math.max(260, Math.floor(pts.length * 0.46));
+        const order = shuffledIndices(pts.length);
+        const keepFlag = new Uint8Array(pts.length);
+        for (let i = 0; i < keep; i += 1) keepFlag[order[i]] = 1;
+
+        const survivors = [];
+        for (let i = 0; i < pts.length; i += 1) {
+          if (!keepFlag[i]) continue;
+          const p = pts[i];
+            const h = sp.homeTargets[i];
+            const dx = h.tx - sp.anchor.x;
+            const dy = h.ty - sp.anchor.y;
+            const warp = 0.35 + Math.random() * 1.08;
+            const nx = h.tx + dx * 0.36 * warp + (Math.random() * 2 - 1) * 30;
+            const ny = h.ty + dy * 0.35 * warp + (Math.random() * 2 - 1) * 26;
+            p.bioTx = nx;
+            p.bioTy = ny;
+            p.tx = nx;
+            p.ty = ny;
+            p.targetAlpha = 1;
+            p.targetSize = Math.max(0.35, p.baseSize * 0.72);
+            survivors.push(p);
+        }
+
+        sp.particles = survivors;
+        sp.hitMap = null;
+        rebuildTextAvoidField(sp);
+      }
+
+      function applyPostAudioOutcome(sp) {
+        if (sp.outcomeApplied) return;
+        sp.outcomeApplied = true;
+        if (sp.status === "extinct") {
+          applyExtinctOutcome(sp);
+          return;
+        }
+        applyEndangeredOutcome(sp);
+      }
+
+      function stopCurrentAudio() {
+        if (!currentActive || !currentActive.audio) return;
+        try {
+          currentActive.audio.pause();
+          currentActive.audio.currentTime = 0;
+        } catch (_err) {
+          void 0;
+        }
+        if (currentActive.mode === "spectrum") restoreBio(currentActive);
+        currentActive = null;
+      }
+
+      function activateSpecies(sp) {
+        if (!sp || !sp.audio || !sp.particles.length || !sp.interactive) return;
+        if (sp.storyState === "gone") return;
+        if (!ensureAudioGraph(sp)) return;
+
+        if (currentActive && currentActive !== sp) stopCurrentAudio();
+
+        currentActive = sp;
+        sp.mode = "spectrum";
+        if (sp.freqData) sp.freqData.fill(0);
+        updateSpectrumTargets(sp, performance.now());
+        rebuildTextAvoidField(sp);
+        try {
+          sp.audio.pause();
+          sp.audio.currentTime = 0;
+        } catch (_err) {
+          void 0;
+        }
+
+        sp.audio.play().catch(() => {
+          restoreBio(sp);
+          if (currentActive === sp) currentActive = null;
+        });
+      }
+
+      function updateSpectrumTargets(sp, t) {
+        const pts = sp.particles;
+        if (!pts.length) return;
+
+        const cols = sp.spectrum.cols;
+        const rows = Math.ceil(pts.length / cols);
+        const specW = sp.spectrum.width;
+        const specH = sp.spectrum.height;
+
+        const x0 = sp.anchor.x - specW * 0.5;
+        const yBottom = sp.anchor.y + specH * 0.5;
+        const rowGap = Math.max(1.45, specH / rows);
+        const jumps = sp.spectrum.jump;
+        const tick = (t * 0.03) | 0;
+
+        if (sp.analyser && sp.freqData) sp.analyser.getByteFrequencyData(sp.freqData);
+
+        for (let i = 0; i < pts.length; i += 1) {
+          const col = i % cols;
+          const row = (i / cols) | 0;
+          const bin = Math.min(sp.freqData.length - 1, ((col / (cols - 1 || 1)) * (sp.freqData.length - 1)) | 0);
+          const amp = (sp.freqData[bin] || 0) / 255;
+
+          const pulse = Math.sin(t * 0.0036 + col * 0.61) * 0.5 + 0.5;
+          const chaos = 0.78 + hash3(col, tick, sp.text.seedTop) * 0.58;
+          const drive = Math.pow(amp, 0.58) * chaos;
+          const candidate = 12 + (drive * 0.95 + pulse * 0.2) * (specH * 0.92);
+          if (candidate > jumps[col]) jumps[col] = candidate;
+          else jumps[col] *= 0.76;
+          const h = clamp(jumps[col], 10, specH * 0.96);
+          const yTop = yBottom - h;
+
+          const x = x0 + ((col + 0.5) / cols) * specW;
+          let y = yBottom - (row + 0.5) * rowGap;
+          if (y < yTop) {
+            const spread = Math.max(1.5, h - 2);
+            y = yTop + ((row * 1.7 + col * 0.8) % spread);
+          }
+
+          const p = pts[i];
+          p.tx = x;
+          p.ty = y;
+          p.targetAlpha = 1;
+          p.targetSize = Math.max(p.baseSize * 0.82, 0.4);
+        }
+      }
+
+      function updateParticles(sp, t) {
+        const pts = sp.particles;
+        const follow = sp.mode === "spectrum" ? SPECTRUM_FOLLOW : HOME_FOLLOW;
+        const driftAmp = sp.mode === "spectrum" ? 0.11 : 0.23;
+        for (let i = 0; i < pts.length; i += 1) {
+          const p = pts[i];
+          const dx = Math.sin(t * 0.00085 + p.phase) * driftAmp;
+          const dy = Math.cos(t * 0.00072 + p.phase * 1.23) * driftAmp;
+          p.x += (p.tx + dx - p.x) * follow;
+          p.y += (p.ty + dy - p.y) * follow;
+          p.alpha += (p.targetAlpha - p.alpha) * ALPHA_EASE;
+          p.size += (p.targetSize - p.size) * SIZE_EASE;
+        }
+
+        if (sp.storyState === "gone") {
+          let alive = 0;
+          for (let i = 0; i < pts.length; i += 1) {
+            if (pts[i].alpha > 0.008 && pts[i].size > 0.06) alive += 1;
+          }
+          if (alive === 0) sp.particles = [];
+        }
+      }
+
+      function updateTextState(sp) {
+        sp.text.coverage += (sp.text.targetCoverage - sp.text.coverage) * 0.025;
+        sp.text.density += (sp.text.targetDensity - sp.text.density) * 0.03;
+      }
+
+      function drawBackground() {
+        ctx.fillStyle = "rgb(5,5,10)";
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      function v4EdgeField(x, y, timeSec) {
+        const surge = Math.pow(0.5 + 0.5 * Math.sin(timeSec * 0.2 + 1.1), 1.9);
+        const merge = 0.5 + 0.5 * Math.sin(timeSec * 0.14 + 0.4);
+        const topWave = Math.sin(timeSec * 0.62 + x * 0.012 + 0.6) * 0.65 + Math.sin(timeSec * 0.34 + x * 0.024 + 1.4) * 0.35;
+        const botWave = Math.sin(timeSec * 0.58 + x * 0.011 + 2.2) * 0.65 + Math.sin(timeSec * 0.31 + x * 0.022 + 2.9) * 0.35;
+        const topD = H * (0.09 + surge * 0.18) + (0.5 + 0.5 * topWave) * 58 + merge * 30;
+        const botD = H * (0.09 + surge * 0.18) + (0.5 + 0.5 * botWave) * 58 + merge * 30;
+
+        const cx = W * 0.5;
+        const cy = H * 0.5;
+        const holeRx = W * (0.28 - surge * 0.08);
+        const holeRy = H * (0.24 - surge * 0.1);
+        const dx = x - cx;
+        const dy = y - cy;
+        const inHole = (dx * dx) / (holeRx * holeRx + 1e-6) + (dy * dy) / (holeRy * holeRy + 1e-6) < 1;
+
+        return {
+          sTop: topD - y,
+          sBottom: y - (H - botD),
+          inHole
+        };
+      }
+
+      function runChar(run, idx) {
+        if (!run || !run.length) return "";
+        return run.charAt(mod(Math.floor(idx), run.length));
+      }
+
+      function drawV4BackgroundText(timeSec) {
+        if (!globalGrid.length) return;
+        const bgFontSize = Math.max(8.4, TEXT_GRID_STEP * TEXT_FONT_SCALE);
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `${bgFontSize}px "MoFang","PingFang SC","Noto Sans SC",sans-serif`;
+
+        for (let i = 0; i < globalGrid.length; i += 1) {
+          const g = globalGrid[i];
+          const ef = v4EdgeField(g.x, g.y, timeSec);
+          if (ef.inHole) continue;
+          let side = "top";
+          let best = ef.sTop;
+          if (ef.sBottom > best) {
+            best = ef.sBottom;
+            side = "bottom";
+          }
+          if (best <= TEXT_GRID_STEP * BG_TEXT_EDGE_THRESHOLD) continue;
+
+          const flow = side === "top"
+            ? g.col * 3 + (g.row + timeSec * BG_TEXT_FLOW_SPEED) * 7 + globalText.seedTop
+            : g.col * 3 + (g.row - timeSec * BG_TEXT_FLOW_SPEED * 1.08) * 7 + globalText.seedBottom;
+          const ch = runChar(side === "top" ? globalText.runTop : globalText.runBottom, flow);
+          if (!ch) continue;
+
+          if (side === "top") ctx.fillStyle = "rgba(116,116,116,0.138)";
+          else ctx.fillStyle = "rgba(120,120,120,0.146)";
+          ctx.fillText(ch, g.x, g.y);
+        }
+        ctx.restore();
+      }
+
+      function isOwnedBySpecies(sp, x, y) {
+        const d0 = (x - sp.anchor.x) * (x - sp.anchor.x) + (y - sp.anchor.y) * (y - sp.anchor.y);
+        for (let i = 0; i < species.length; i += 1) {
+          const other = species[i];
+          if (other === sp || !other.imageReady) continue;
+          const d1 = (x - other.anchor.x) * (x - other.anchor.x) + (y - other.anchor.y) * (y - other.anchor.y);
+          if (d1 < d0) return false;
+        }
+        return true;
+      }
+
+      function rebuildTextAvoidField(sp) {
+        if (!sp || !sp.imageReady) return;
+        if (sp.storyState === "gone") {
+          sp.text.avoidField = null;
+          return;
+        }
+        const cols = Math.ceil(W / TEXT_X_STEP) + 3;
+        const rows = Math.ceil(H / TEXT_GRID_STEP) + 3;
+        const cells = new Uint8Array(cols * rows);
+
+        const stamp = (px, py, rxPx, ryPx) => {
+          const cx = Math.round(px / TEXT_X_STEP) + 1;
+          const cy = Math.round(py / TEXT_GRID_STEP) + 1;
+          const rx = Math.max(1, Math.ceil(rxPx / TEXT_X_STEP));
+          const ry = Math.max(1, Math.ceil(ryPx / TEXT_GRID_STEP));
+          for (let oy = -ry; oy <= ry; oy += 1) {
+            const gy = cy + oy;
+            if (gy < 0 || gy >= rows) continue;
+            for (let ox = -rx; ox <= rx; ox += 1) {
+              const gx = cx + ox;
+              if (gx < 0 || gx >= cols) continue;
+              const eq = (ox * ox) / (rx * rx + 1e-6) + (oy * oy) / (ry * ry + 1e-6);
+              if (eq > 1.08) continue;
+              cells[gy * cols + gx] = 1;
+            }
+          }
+        };
+
+        const pts = sp.particles;
+        const stride = pts.length > 1200 ? 2 : 1;
+        for (let i = 0; i < pts.length; i += stride) {
+          const p = pts[i];
+          stamp(p.tx, p.ty, AVOID_RADIUS_X, AVOID_RADIUS_Y);
+        }
+
+        for (let pass = 0; pass < AVOID_DILATE_PASSES; pass += 1) {
+          const next = new Uint8Array(cells);
+          for (let gy = 1; gy < rows - 1; gy += 1) {
+            for (let gx = 1; gx < cols - 1; gx += 1) {
+              const idx = gy * cols + gx;
+              if (cells[idx]) continue;
+              if (
+                cells[idx - 1] || cells[idx + 1] ||
+                cells[idx - cols] || cells[idx + cols] ||
+                cells[idx - cols - 1] || cells[idx - cols + 1] ||
+                cells[idx + cols - 1] || cells[idx + cols + 1]
+              ) {
+                next[idx] = 1;
+              }
+            }
+          }
+          cells.set(next);
+        }
+
+        sp.text.avoidField = { cols, rows, cells };
+      }
+
+      function rebuildAllTextAvoidFields() {
+        for (let i = 0; i < species.length; i += 1) rebuildTextAvoidField(species[i]);
+      }
+
+      function isAvoidedByParticleField(sp, x, y) {
+        const f = sp.text.avoidField;
+        if (!f) return false;
+        const gx = Math.round(x / TEXT_X_STEP) + 1;
+        const gy = Math.round(y / TEXT_GRID_STEP) + 1;
+        if (gx < 0 || gy < 0 || gx >= f.cols || gy >= f.rows) return false;
+        return f.cells[gy * f.cols + gx] === 1;
+      }
+
+      function drawTextWrap(sp, timeSec) {
+        if (!sp.shape || !globalGrid.length) return;
+
+        const ax = sp.anchor.x;
+        const ay = sp.anchor.y;
+        const rx = Math.max(96, sp.shape.w * 0.48);
+        const ry = Math.max(72, sp.shape.h * 0.5);
+
+        const cover = clamp(sp.text.coverage, 0.35, 1.65);
+        const isGone = sp.storyState === "gone";
+        const inner = isGone
+          ? Math.max(0.02, 0.68 - cover * 0.38)
+          : Math.max(1.02, 1.18 - cover * 0.1);
+        const outer = isGone
+          ? 1.9 + cover * 0.7
+          : 1.68 + cover * 0.42;
+
+        const minX = ax - rx * outer;
+        const maxX = ax + rx * outer;
+        const minY = ay - ry * outer;
+        const maxY = ay + ry * outer;
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const fontSize = Math.max(8.4, TEXT_GRID_STEP * TEXT_FONT_SCALE);
+        ctx.font = `${fontSize}px "MoFang","PingFang SC","Noto Sans SC",sans-serif`;
+        ctx.fillStyle = "rgb(255,255,255)";
+
+        for (let i = 0; i < globalGrid.length; i += 1) {
+          const g = globalGrid[i];
+          if (g.x < minX || g.x > maxX || g.y < minY || g.y > maxY) continue;
+          if (!isGone && isAvoidedByParticleField(sp, g.x, g.y)) continue;
+          if (!isOwnedBySpecies(sp, g.x, g.y)) continue;
+          const dx = (g.x - ax) / rx;
+          const dy = (g.y - ay) / ry;
+          const q = dx * dx + dy * dy;
+          if (q < inner * inner || q > outer * outer) continue;
+
+          const dist = Math.sqrt(q);
+          const edgeMix = 1 - Math.min(1, Math.abs(dist - inner) / Math.max(0.001, outer - inner));
+          const den = sp.text.density * (0.56 + edgeMix * 0.56);
+          const h = hash3(g.col, g.row, sp.text.seedTop + sp.text.seedBottom);
+          if (h > den) continue;
+
+          const top = g.y <= ay;
+          const flow = top
+            ? g.col * 3 + (g.row + timeSec * TEXT_FLOW_SPEED) * 7 + sp.text.seedTop
+            : g.col * 3 + (g.row - timeSec * TEXT_FLOW_SPEED * 1.06) * 7 + sp.text.seedBottom;
+          const ch = runChar(top ? sp.text.runTop : sp.text.runBottom, flow);
+          if (!ch) continue;
+          ctx.fillText(ch, g.x, g.y);
+        }
+
+        ctx.restore();
+      }
+
+      function drawRuntimeMessage() {
+        if (!runtimeMessage) return;
+        ctx.save();
+        ctx.fillStyle = "rgba(5, 8, 14, 0.72)";
+        ctx.fillRect(0, H - 58, W, 58);
+        ctx.fillStyle = "rgba(232, 240, 255, 0.92)";
+        ctx.font = "15px PingFang SC, Noto Sans SC, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(runtimeMessage, W * 0.5, H - 29);
+        ctx.restore();
+      }
+
+      function render(t) {
+        const timeSec = t * 0.001;
+        drawBackground();
+        drawV4BackgroundText(timeSec);
+
+        for (let i = 0; i < species.length; i += 1) {
+          const sp = species[i];
+          if (!sp.imageReady) continue;
+          updateTextState(sp);
+          drawTextWrap(sp, timeSec);
+        }
+
+        ctx.globalCompositeOperation = "lighter";
+
+        for (let i = 0; i < species.length; i += 1) {
+          const sp = species[i];
+          if (!sp.particles.length) continue;
+
+          if (sp === currentActive && sp.mode === "spectrum") {
+            if (sp.audio && !sp.audio.paused) updateSpectrumTargets(sp, t);
+          } else if (sp.mode === "spectrum") {
+            restoreBio(sp);
+          }
+
+          updateParticles(sp, t);
+
+          for (let k = 0; k < sp.particles.length; k += 1) {
+            const p = sp.particles[k];
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        drawRuntimeMessage();
+
+        requestAnimationFrame(render);
+      }
+
+      function hitByAlpha(sp, mx, my) {
+        if (!sp.hitMap) return false;
+        const hm = sp.hitMap;
+        const lx = (mx - hm.ox) / hm.scale;
+        const ly = (my - hm.oy) / hm.scale;
+        if (lx < 0 || ly < 0 || lx >= hm.rw || ly >= hm.rh) return false;
+
+        const x = lx | 0;
+        const y = ly | 0;
+        const idx = y * hm.rw + x;
+        return hm.alpha[idx] > ALPHA_CUTOFF;
+      }
+
+      function hitByParticles(sp, mx, my) {
+        const pts = sp.particles;
+        for (let i = 0; i < pts.length; i += 1) {
+          const p = pts[i];
+          const dx = mx - p.x;
+          const dy = my - p.y;
+          if (dx * dx + dy * dy < 64) return true;
+        }
+        return false;
+      }
+
+      function pickSpecies(mx, my) {
+        for (let i = 0; i < species.length; i += 1) {
+          const sp = species[i];
+          if (!sp.interactive) continue;
+          if (!sp.particles.length) continue;
+          if (hitByAlpha(sp, mx, my)) return sp;
+        }
+        for (let i = 0; i < species.length; i += 1) {
+          const sp = species[i];
+          if (!sp.interactive) continue;
+          if (!sp.particles.length) continue;
+          if (hitByParticles(sp, mx, my)) return sp;
+        }
+        return null;
+      }
+
+      async function init() {
+        runtimeMessage = "";
+        for (let i = 0; i < SPECIES_CONFIG.length; i += 1) {
+          const conf = SPECIES_CONFIG[i];
+          const sp = makeSpeciesState(conf, i);
+          species.push(sp);
+
+          try {
+            sp.image = await loadImageWithFallback(conf.imageFile, conf.imageBases);
+            sp.imageReady = true;
+          } catch (err) {
+            console.error(`[${sp.key}] image load failed`, err);
+            runtimeMessage = "素材图片加载失败，请检查 sours/crap 与页面相对路径。";
+          }
+
+          initTextRuns(sp);
+
+          sp.audio = await createAudioElement(conf.audioFile, conf.audioBases);
+          sp.audioReady = !!sp.audio;
+          if (sp.audio) {
+            sp.audio.addEventListener("ended", () => {
+              applyPostAudioOutcome(sp);
+              if (currentActive === sp) currentActive = null;
+            });
+          }
+        }
+
+        try {
+          resize();
+        } catch (err) {
+          console.error(err);
+          runtimeMessage = "初始化失败：图片像素读取异常。建议使用 python3 -m http.server 启动。";
+        }
+
+        requestAnimationFrame(render);
+      }
+
+      canvas.addEventListener("pointerdown", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const sp = pickSpecies(mx, my);
+        if (!sp) return;
+        activateSpecies(sp);
+      });
+
+      window.addEventListener("resize", () => {
+        resize();
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>
